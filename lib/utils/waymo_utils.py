@@ -7,6 +7,7 @@ import open3d as o3d
 import math
 from glob import glob
 from tqdm import tqdm 
+from PIL import Image
 from lib.config import cfg
 from lib.utils.box_utils import bbox_to_corner3d, inbbox_points, get_bound_2d_mask
 from lib.utils.colmap_utils import read_points3D_binary, read_extrinsics_binary, qvec2rotmat
@@ -319,6 +320,8 @@ def generate_dataparser_outputs(
     
     image_dir = os.path.join(datadir, 'images')
     image_filenames_all = sorted(glob(os.path.join(image_dir, '*.png')))
+    dynamic_mask_dir = os.path.join(datadir, 'dynamic_mask')
+    dynamic_mask_filenames_all = sorted(glob(os.path.join(dynamic_mask_dir, "*.png")))
     num_frames_all = len(image_filenames_all) // 5
     num_cameras = len(cameras)
     
@@ -338,6 +341,7 @@ def generate_dataparser_outputs(
     frames_idx = []
     cams = []
     image_filenames = []
+    dynamic_mask_filenames = []
     
     ixts = []
     exts = []
@@ -361,8 +365,9 @@ def generate_dataparser_outputs(
         
     for frame in range(start_frame, end_frame+1):
         frames_timestamps.append(timestamps['FRAME'][f'{frame:06d}'])
-    
-    for image_filename in image_filenames_all:
+
+    has_dynamic_mask_dir = True
+    for idx, image_filename in enumerate(image_filenames_all):
         image_basename = os.path.basename(image_filename)
         frame = image_filename_to_frame(image_basename)
         cam = image_filename_to_cam(image_basename)
@@ -376,6 +381,13 @@ def generate_dataparser_outputs(
             frames_idx.append(frame - start_frame)
             cams.append(cam)
             image_filenames.append(image_filename)
+            try:
+                dynamic_mask_filenames.append(dynamic_mask_filenames_all[idx])
+            except:
+                if has_dynamic_mask_dir:
+                    print("no mask dir")
+                    has_mask_dir = False
+                
             
             ixts.append(ixt)
             exts.append(ext)
@@ -432,34 +444,42 @@ def generate_dataparser_outputs(
 
     # get object bounding mask
     obj_bounds = []
-    for i, image_filename in tqdm(enumerate(image_filenames)):
-        cam = cams[i]
-        h, w = image_heights[cam], image_widths[cam]
-        obj_bound = np.zeros((h, w)).astype(np.uint8)
-        obj_tracklets = object_tracklets_vehicle[frames_idx[i]]
-        ixt, ext = ixts[i], exts[i]
-        for obj_tracklet in obj_tracklets:
-            track_id = int(obj_tracklet[0])
-            if track_id >= 0:
-                obj_pose_vehicle = np.eye(4)    
-                obj_pose_vehicle[:3, :3] = quaternion_to_matrix_numpy(obj_tracklet[4:8])
-                obj_pose_vehicle[:3, 3] = obj_tracklet[1:4]
-                obj_length = object_info[track_id]['length']
-                obj_width = object_info[track_id]['width']
-                obj_height = object_info[track_id]['height']
-                bbox = np.array([[-obj_length, -obj_width, -obj_height], 
-                                 [obj_length, obj_width, obj_height]]) * 0.5
-                corners_local = bbox_to_corner3d(bbox)
-                corners_local = np.concatenate([corners_local, np.ones_like(corners_local[..., :1])], axis=-1)
-                corners_vehicle = corners_local @ obj_pose_vehicle.T # 3D bounding box in vehicle frame
-                mask = get_bound_2d_mask(
-                    corners_3d=corners_vehicle[..., :3],
-                    K=ixt,
-                    pose=np.linalg.inv(ext), 
-                    H=h, W=w
-                )
-                obj_bound = np.logical_or(obj_bound, mask)
-        obj_bounds.append(obj_bound)
+    # 先用dir中的，没有再用project的
+    if has_dynamic_mask_dir:
+        for idx, dynamic_mask_filename in enumerate(dynamic_mask_filenames):
+            # Todo check bug
+            obj_bound = np.array(Image.open(dynamic_mask_filename))
+            obj_bounds = obj_bound
+            
+    else:
+        for i, image_filename in tqdm(enumerate(image_filenames)):
+            cam = cams[i]
+            h, w = image_heights[cam], image_widths[cam]
+            obj_bound = np.zeros((h, w)).astype(np.uint8)
+            obj_tracklets = object_tracklets_vehicle[frames_idx[i]]
+            ixt, ext = ixts[i], exts[i]
+            for obj_tracklet in obj_tracklets:
+                track_id = int(obj_tracklet[0])
+                if track_id >= 0:
+                    obj_pose_vehicle = np.eye(4)    
+                    obj_pose_vehicle[:3, :3] = quaternion_to_matrix_numpy(obj_tracklet[4:8])
+                    obj_pose_vehicle[:3, 3] = obj_tracklet[1:4]
+                    obj_length = object_info[track_id]['length']
+                    obj_width = object_info[track_id]['width']
+                    obj_height = object_info[track_id]['height']
+                    bbox = np.array([[-obj_length, -obj_width, -obj_height], 
+                                    [obj_length, obj_width, obj_height]]) * 0.5
+                    corners_local = bbox_to_corner3d(bbox)
+                    corners_local = np.concatenate([corners_local, np.ones_like(corners_local[..., :1])], axis=-1)
+                    corners_vehicle = corners_local @ obj_pose_vehicle.T # 3D bounding box in vehicle frame
+                    mask = get_bound_2d_mask(
+                        corners_3d=corners_vehicle[..., :3],
+                        K=ixt,
+                        pose=np.linalg.inv(ext), 
+                        H=h, W=w
+                    )
+                    obj_bound = np.logical_or(obj_bound, mask)
+            obj_bounds.append(obj_bound)
     result['obj_bounds'] = obj_bounds         
     
     # os.makedirs('obj_bounds', exist_ok=True)

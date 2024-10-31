@@ -11,7 +11,7 @@ class ActorPose(nn.Module):
         # frame_timestamps: [num_frames]
         super().__init__()
         tracklets = torch.from_numpy(tracklets).float().cuda()
-        self.track_ids = tracklets[..., 0] # [num_frames, max_obj]
+        self.track_ids = tracklets[..., 0] # [num_frames, max_obj], id
         self.input_trans = tracklets[..., 1:4] # [num_frames, max_obj, [x, y, z]]
         self.input_rots = tracklets[..., 4:8] # [num_frames, max_obj, [qw, qx, qy, qz]]
         self.timestamps = tracklet_timestamps
@@ -82,7 +82,7 @@ class ActorPose(nn.Module):
         
     def find_closest_indices(self, track_id, timestamp):
         track_idx = self.obj_info[track_id]['track_idx']
-        frame_idx = track_idx[:, 0].cpu()
+        frame_idx = track_idx[:, 0].cpu() # 出现在哪些帧
         frame_timestamps = np.array(self.timestamps[frame_idx])
         assert len(frame_timestamps) > 1
         delta_timestamps = np.abs(frame_timestamps - timestamp)
@@ -177,3 +177,79 @@ class ActorPose(nn.Module):
                 return rots
         else:
             return self.get_tracking_rotation_(track_id, camera.meta['timestamp'])
+    
+    
+    def get_tracking_rotation_ninterp(self, track_id, camera: Camera):
+        timestamp = camera.meta['timestamp']
+        ind1, ind2 = self.find_closest_indices(track_id, timestamp)
+        frame_ind1, frame_ind2 = ind1[0], ind2[0]
+        column_ind1, column_ind2 = ind1[1], ind2[1]
+        timestamp1, timestamp2 = self.timestamps[frame_ind1.cpu()], self.timestamps[frame_ind2.cpu()]
+        
+        if self.opt_track:
+            rots1 = self.input_rots[frame_ind1, column_ind1]
+            rots2 = self.input_rots[frame_ind2, column_ind2]
+            opt_rots1 = torch.zeros_like(rots1)
+            opt_rots2 = torch.zeros_like(rots2)
+            opt_rots1[0] = torch.cos(self.opt_rots[frame_ind1, column_ind1])
+            opt_rots1[3] = torch.sin(self.opt_rots[frame_ind1, column_ind1])
+            opt_rots2[0] = torch.cos(self.opt_rots[frame_ind2, column_ind2])
+            opt_rots2[3] = torch.sin(self.opt_rots[frame_ind2, column_ind2])            
+
+            rots1 = quaternion_raw_multiply(rots1.unsqueeze(0), opt_rots1.unsqueeze(0)).squeeze(0)
+            rots2 = quaternion_raw_multiply(rots2.unsqueeze(0), opt_rots2.unsqueeze(0)).squeeze(0)
+
+        else:
+            rots1 = self.input_rots[frame_ind1, column_ind1]
+            rots2 = self.input_rots[frame_ind2, column_ind2]
+
+        r = (timestamp - timestamp1) / (timestamp2 - timestamp1)
+        rots = quaternion_slerp(rots1, rots2, r)
+
+        return rots1
+    def get_tracking_rotation_ninp(self, track_id, camera: Camera):
+        timestamp = camera.meta['timestamp']
+        ind1, ind2 = self.find_closest_indices(track_id, timestamp)
+        frame_ind1, frame_ind2 = ind1[0], ind2[0]
+        column_ind1, column_ind2 = ind1[1], ind2[1]
+        timestamp1, timestamp2 = self.timestamps[frame_ind1.cpu()], self.timestamps[frame_ind2.cpu()]
+        
+        if self.opt_track:
+            rots1 = self.input_rots[frame_ind1, column_ind1]
+            rots2 = self.input_rots[frame_ind2, column_ind2]
+            opt_rots1 = torch.zeros_like(rots1)
+            opt_rots2 = torch.zeros_like(rots2)
+            opt_rots1[0] = torch.cos(self.opt_rots[frame_ind1, column_ind1])
+            opt_rots1[3] = torch.sin(self.opt_rots[frame_ind1, column_ind1])
+            opt_rots2[0] = torch.cos(self.opt_rots[frame_ind2, column_ind2])
+            opt_rots2[3] = torch.sin(self.opt_rots[frame_ind2, column_ind2])            
+
+            rots1 = quaternion_raw_multiply(rots1.unsqueeze(0), opt_rots1.unsqueeze(0)).squeeze(0)
+            rots2 = quaternion_raw_multiply(rots2.unsqueeze(0), opt_rots2.unsqueeze(0)).squeeze(0)
+
+        else:
+            rots1 = self.input_rots[frame_ind1, column_ind1]
+            rots2 = self.input_rots[frame_ind2, column_ind2]
+
+        r = (timestamp - timestamp1) / (timestamp2 - timestamp1)
+        rots = quaternion_slerp(rots1, rots2, r)
+
+        return rots1
+    
+    def get_tracking_translation_ninp(self, track_id, camera: Camera):
+        timestamp = camera.meta['timestamp']
+        ind1, ind2 = self.find_closest_indices(track_id, timestamp)
+        frame_ind1, frame_ind2 = ind1[0], ind2[0]
+        column_ind1, column_ind2 = ind1[1], ind2[1]
+        timestamp1, timestamp2 = self.timestamps[frame_ind1.cpu()], self.timestamps[frame_ind2.cpu()]
+
+        if self.opt_track:
+            trans1 = self.input_trans[frame_ind1, column_ind1] + self.opt_trans[frame_ind1, column_ind1]
+            trans2 = self.input_trans[frame_ind2, column_ind2] + self.opt_trans[frame_ind2, column_ind2]
+        else:
+            trans1 = self.input_trans[frame_ind1, column_ind1]
+            trans2 = self.input_trans[frame_ind2, column_ind2]
+        
+        trans = (trans1 * (timestamp2 - timestamp) + trans2 * (timestamp - timestamp1)) / (timestamp2 - timestamp1)        
+            
+        return trans1
