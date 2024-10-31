@@ -112,3 +112,35 @@ def storePly(path, xyz, rgb):
     vertex_element = PlyElement.describe(elements, 'vertex')
     ply_data = PlyData([vertex_element])
     ply_data.write(path)
+
+def convert_BCP(xyz, rgb):
+    '''
+    description : 将colmap读取的xyz,rgb转换成BCP对象
+    param [*] xyz : np
+    param [*] rgb : np
+    param [*] man_trans : 曼哈顿对齐
+    return [*] : 返回BCP
+    '''
+    # Define the dtype for the structured array
+    dtype = [('x', 'f4'), ('y', 'f4'), ('z', 'f4'),
+            ('nx', 'f4'), ('ny', 'f4'), ('nz', 'f4'),
+            ('red', 'u1'), ('green', 'u1'), ('blue', 'u1')]
+    
+    normals = np.zeros_like(xyz)
+
+    elements = np.empty(xyz.shape[0], dtype=dtype)
+    attributes = np.concatenate((xyz, normals, rgb), axis=1)
+    elements[:] = list(map(tuple, attributes))
+
+    # Create the PlyData object and write to file
+    vertex_element = PlyElement.describe(elements, 'vertex')
+    plydata = PlyData([vertex_element])
+
+    vertices = plydata['vertex']  # 提取点云的顶点
+    positions = np.vstack([vertices['x'], vertices['y'], vertices['z']]).T  # 将x,y,z这三个坐标属性堆叠在一起
+    # print(positions.shape)
+    colors = np.vstack(
+        [vertices['red'], vertices['green'], vertices['blue']]).T / 255.0  # 将R,G,B三个颜色属性堆叠在一起，并除以255进行归一化
+    normals = np.vstack([vertices['nx'], vertices['ny'], vertices['nz']]).T  # 提取顶点的三个法向量属性，并堆叠在一起
+
+    return BasicPointCloud(points=positions, colors=colors, normals=normals)

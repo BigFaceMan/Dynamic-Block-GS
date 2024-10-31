@@ -86,6 +86,7 @@ def readWaymoFullInfo(path, images='images', split_train=-1, split_test=-1, **kw
         train_every=split_train if split_train > 0 else None,
     )
 
+    # obj 相关的info 放到的scene_metadata 后面分别给obj_model 和 pose_model
     scene_metadata = dict()
     scene_metadata['obj_tracklets'] = obj_tracklets
     scene_metadata['tracklet_timestamps'] = tracklet_timestamps

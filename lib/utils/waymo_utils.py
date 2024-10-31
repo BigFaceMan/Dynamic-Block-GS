@@ -86,12 +86,14 @@ def make_obj_pose(ego_pose, box_info):
     c = math.cos(heading)
     s = math.sin(heading)
     rotz_matrix = np.array([[c, -s, 0], [s, c, 0], [0, 0, 1]])
-
+    # obj->vehicle
     obj_pose_vehicle = np.eye(4)
     obj_pose_vehicle[:3, :3] = rotz_matrix
     obj_pose_vehicle[:3, 3] = np.array([tx, ty, tz])
+    # obj->world
     obj_pose_world = np.matmul(ego_pose, obj_pose_vehicle)
 
+    # 转换到[位移 + 四元数] 七个数来存储
     obj_rotation_vehicle = torch.from_numpy(obj_pose_vehicle[:3, :3]).float().unsqueeze(0)
     obj_quaternion_vehicle = matrix_to_quaternion(obj_rotation_vehicle).squeeze(0).numpy()
     obj_quaternion_vehicle = obj_quaternion_vehicle / np.linalg.norm(obj_quaternion_vehicle)
@@ -110,19 +112,31 @@ def make_obj_pose(ego_pose, box_info):
 
 
 def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2, 3, 4]):
+    '''
+    description : 得到track_obj的一些信息
+    param [*] datadir : 数据目录
+    param [*] selected_frames :
+    param [*] ego_poses : frame_pose
+    param [*] cameras : 用哪些cam
+    return [*]
+    '''
+
     tracklets_ls = []    
-    objects_info = {}
+    objects_info = {} # track_id -> obj_info
 
     if cfg.data.get('use_tracker', False):
         tracklet_path = os.path.join(datadir, 'track/track_info_castrack.txt')
         tracklet_camera_vis_path = os.path.join(datadir, 'track/track_camera_vis_castrack.json')
     else:
+        # track_info
         tracklet_path = os.path.join(datadir, 'track/track_info.txt')
+        # obj在每一帧被哪些cam追踪到了
         tracklet_camera_vis_path = os.path.join(datadir, 'track/track_camera_vis.json')
 
     print(f'Loading from : {tracklet_path}')
     f = open(tracklet_path, 'r')
     tracklets_str = f.read().splitlines()
+    tracklets_head = tracklets_str[0]
     tracklets_str = tracklets_str[1:]
     
     f = open(tracklet_camera_vis_path, 'r')
@@ -134,8 +148,9 @@ def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2,
     n_cameras = 5
     n_images = len(os.listdir(image_dir))
     n_frames = n_images // n_cameras
+    # 当前帧有多少个obj
     n_obj_in_frame = np.zeros(n_frames)
-    
+    # 过滤数据，并得到每帧有多少个obj
     for tracklet in tracklets_str:
         tracklet = tracklet.split()
         frame_id = int(tracklet[0])
@@ -163,6 +178,7 @@ def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2,
             objects_info[track_id]['width'] = max(objects_info[track_id]['width'], float(tracklet[5]))
             objects_info[track_id]['length'] = max(objects_info[track_id]['length'], float(tracklet[6]))
             
+        # track_info 的所有信息 即原始数据
         tr_array = np.concatenate(
             [np.array(tracklet[:2]).astype(np.float64), np.array([type]), np.array(tracklet[4:]).astype(np.float64)]
         )
@@ -172,6 +188,8 @@ def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2,
     tracklets_array = np.array(tracklets_ls)
     max_obj_per_frame = int(n_obj_in_frame[start_frame:end_frame + 1].max())
     num_frames = end_frame - start_frame + 1
+    # obj ids pose vehicle/world
+    # 当前帧当前位置的obj_track_id / obj->vehicle / obj->world
     visible_objects_ids = np.ones([num_frames, max_obj_per_frame]) * -1.0
     visible_objects_pose_vehicle = np.ones([num_frames, max_obj_per_frame, 7]) * -1.0
     visible_objects_pose_world = np.ones([num_frames, max_obj_per_frame, 7]) * -1.0
@@ -181,7 +199,8 @@ def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2,
         frame_id = int(tracklet[0])
         track_id = int(tracklet[1])
         if start_frame <= frame_id <= end_frame:            
-            ego_pose = ego_poses[frame_id]
+            ego_pose = ego_poses[frame_id] # vehle->w
+            # obj->vehle  obj->world
             obj_pose_vehicle, obj_pose_world = make_obj_pose(ego_pose, tracklet[6:10])
 
             frame_idx = frame_id - start_frame
@@ -217,7 +236,8 @@ def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2,
         visible_objects_ids = np.ones([num_frames, 1]) * -1.0
         visible_objects_pose_world = np.ones([num_frames, 1, 7]) * -1.0
         visible_objects_pose_vehicle = np.ones([num_frames, 1, 7]) * -1.0    
-    elif max_obj_per_frame_new < max_obj_per_frame:
+    elif max_obj_per_frame_new < max_obj_per_frame: 
+        # 如果有删除的静态的obj 则重新构造一下并赋值
         visible_objects_ids_new = np.ones([num_frames, max_obj_per_frame_new]) * -1.0
         visible_objects_pose_vehicle_new = np.ones([num_frames, max_obj_per_frame_new, 7]) * -1.0
         visible_objects_pose_world_new = np.ones([num_frames, max_obj_per_frame_new, 7]) * -1.0
@@ -256,7 +276,7 @@ def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2,
         obj_frames = frames[obj_frame_idx]
         obj['start_frame'] = np.min(obj_frames)
         obj['end_frame'] = np.max(obj_frames)
-        
+        # track_id class class_label height width length start_frame end_frame
         objects_info[key] = obj
 
     # [num_frames, max_obj, track_id, x, y, z, qw, qx, qy, qz]
@@ -269,6 +289,8 @@ def get_obj_pose_tracking(datadir, selected_frames, ego_poses, cameras=[0, 1, 2,
     )
     
     
+    # [num_frames, max_obj, track_id, x, y, z, qw, qx, qy, qz]
+    # track_id class class_label height width length start_frame end_frame
     return objects_tracklets_world, objects_tracklets_vehicle, objects_info
 
 def padding_tracklets(tracklets, frame_timestamps, min_timestamp, max_timestamp):
@@ -374,13 +396,17 @@ def generate_dataparser_outputs(
     frames_timestamps = np.array(frames_timestamps) - timestamp_offset
     min_timestamp, max_timestamp = min(cams_timestamps.min(), frames_timestamps.min()), max(cams_timestamps.max(), frames_timestamps.max())
  
+
+    # track_id class class_label height width length start_frame end_frame
+    # [num_frames, max_obj, track_id, x, y, z, qw, qx, qy, qz]
     _, object_tracklets_vehicle, object_info = get_obj_pose_tracking(
         datadir, 
         selected_frames, 
         ego_frame_poses,
         cameras,
     )
-    
+
+    # frame -> frame_time
     for track_id in object_info.keys():
         object_start_frame = object_info[track_id]['start_frame']
         object_end_frame = object_info[track_id]['end_frame']

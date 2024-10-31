@@ -1,7 +1,7 @@
 '''
 Author: ssp
 Date: 2024-10-23 21:14:25
-LastEditTime: 2024-10-27 15:21:55
+LastEditTime: 2024-10-30 10:44:26
 '''
 import torch
 import torch.nn as nn
@@ -242,6 +242,7 @@ class StreetGaussianModel(nn.Module):
             self.sky_cubemap = None    
                              
         # Build actor model 
+        # 专门用一个东西来做pose变换
         if self.include_obj:
             self.actor_pose = ActorPose(obj_tracklets, tracklet_timestamps, camera_timestamps, obj_info)
         else:

@@ -13,6 +13,15 @@ data:
   use_colmap: true
   filter_colmap: true
 
+block:
+  m_region: 2
+  n_region: 1
+  x_ax: 0
+  z_ax: 1
+  extend_rate: 0.1
+  visible_rate: 0.5
+  data_vis: true
+
 model:
   gaussian:
     sh_degree: 1
