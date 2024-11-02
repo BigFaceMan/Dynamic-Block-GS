@@ -322,6 +322,8 @@ def generate_dataparser_outputs(
     image_filenames_all = sorted(glob(os.path.join(image_dir, '*.png')))
     dynamic_mask_dir = os.path.join(datadir, 'dynamic_mask')
     dynamic_mask_filenames_all = sorted(glob(os.path.join(dynamic_mask_dir, "*.png")))
+    mask_dir = os.path.join(datadir, "mask")
+    mask_filenames_all = sorted(glob(os.path.join(mask_dir, "*.png")))
     num_frames_all = len(image_filenames_all) // 5
     num_cameras = len(cameras)
     
@@ -342,6 +344,7 @@ def generate_dataparser_outputs(
     cams = []
     image_filenames = []
     dynamic_mask_filenames = []
+    mask_filenames = []
     
     ixts = []
     exts = []
@@ -367,6 +370,7 @@ def generate_dataparser_outputs(
         frames_timestamps.append(timestamps['FRAME'][f'{frame:06d}'])
 
     has_dynamic_mask_dir = True
+    has_mask_dir = True
     for idx, image_filename in enumerate(image_filenames_all):
         image_basename = os.path.basename(image_filename)
         frame = image_filename_to_frame(image_basename)
@@ -385,6 +389,13 @@ def generate_dataparser_outputs(
                 dynamic_mask_filenames.append(dynamic_mask_filenames_all[idx])
             except:
                 if has_dynamic_mask_dir:
+                    print("no dynamic mask dir")
+                    has_dynamic_mask_dir = False
+            
+            try:
+                mask_filenames.append(mask_filenames_all[idx])
+            except:
+                if has_mask_dir:
                     print("no mask dir")
                     has_mask_dir = False
                 
@@ -449,8 +460,8 @@ def generate_dataparser_outputs(
         for idx, dynamic_mask_filename in enumerate(dynamic_mask_filenames):
             # Todo check bug
             obj_bound = np.array(Image.open(dynamic_mask_filename))
-            obj_bounds = obj_bound
-            
+            # Fix bug 没加入bound
+            obj_bounds.append(obj_bound) 
     else:
         for i, image_filename in tqdm(enumerate(image_filenames)):
             cam = cams[i]
@@ -481,6 +492,15 @@ def generate_dataparser_outputs(
                     obj_bound = np.logical_or(obj_bound, mask)
             obj_bounds.append(obj_bound)
     result['obj_bounds'] = obj_bounds         
+
+    # get img mask
+    mask_bounds = []
+    if has_mask_dir:
+        for idx, mask_filename in enumerate(mask_filenames):
+            mask_bound = np.array(Image.open(mask_filename))
+            mask_bounds.append(mask_bound)
+    result['mask_bounds'] = mask_bounds
+    
     
     # os.makedirs('obj_bounds', exist_ok=True)
     # for i, x in enumerate(obj_bounds):

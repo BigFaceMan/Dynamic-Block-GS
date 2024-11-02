@@ -80,6 +80,7 @@ def readWaymoFullInfo(path, images='images', split_train=-1, split_test=-1, **kw
     cams_timestamps = output['cams_timestamps']
     tracklet_timestamps = output['tracklet_timestamps']
     obj_bounds = output['obj_bounds']
+    mask_bounds = output['mask_bounds']
     train_frames, test_frames = get_val_frames(
         num_frames, 
         test_every=split_test if split_test > 0 else None,
@@ -182,7 +183,11 @@ def readWaymoFullInfo(path, images='images', split_train=-1, split_test=-1, **kw
             mono_depth = np.load(mono_depth_path)
             metadata['mono_depth'] = mono_depth
 
-        mask = None        
+        if len(mask_bounds) > 0:
+            mask = Image.fromarray(mask_bounds[i])        
+        else:
+            mask = None
+        
         cam_info = CameraInfo(
             uid=i, R=R, T=T, FovY=FovY, FovX=FovX, K=K,
             image=image, image_path=image_path, image_name=image_name,

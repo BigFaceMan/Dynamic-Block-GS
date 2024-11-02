@@ -1,6 +1,6 @@
 task: waymo_full_exp
 source_path: /lfs3/users/spsong/dataset/waymo/training/002
-exp_name: waymo_train_002_0_198_segnopt_ninp
+exp_name: waymo_train_002_0_198_segopt_ninp
 
 data:
   split_test: -1
@@ -32,7 +32,7 @@ model:
     include_bkgd: true
     include_obj: true
     include_sky: true
-    opt_track: false
+    opt_track: true
 
 train:
   iterations: 50000

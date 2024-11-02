@@ -1,7 +1,7 @@
 '''
 Author: ssp
 Date: 2024-10-23 21:14:25
-LastEditTime: 2024-10-30 10:44:26
+LastEditTime: 2024-11-02 10:20:01
 '''
 import torch
 import torch.nn as nn
@@ -388,8 +388,13 @@ class StreetGaussianModel(nn.Module):
             for i, obj_name in enumerate(self.graph_obj_list):
                 obj_model: GaussianModelActor = getattr(self, obj_name)
                 track_id = obj_model.track_id
+                # interploate
                 obj_rot = self.actor_pose.get_tracking_rotation(track_id, self.viewpoint_camera)
                 obj_trans = self.actor_pose.get_tracking_translation(track_id, self.viewpoint_camera)                
+                # don't interploate 
+                # obj_rot = self.actor_pose.get_tracking_rotation_ninp(track_id, self.viewpoint_camera)
+                # obj_trans = self.actor_pose.get_tracking_translation_ninp(track_id, self.viewpoint_camera)                
+
                 ego_pose = self.viewpoint_camera.ego_pose
                 ego_pose_rot = matrix_to_quaternion(ego_pose[:3, :3].unsqueeze(0)).squeeze(0)
                 obj_rot = quaternion_raw_multiply(ego_pose_rot.unsqueeze(0), obj_rot.unsqueeze(0)).squeeze(0)

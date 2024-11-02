@@ -281,7 +281,7 @@ class GaussianModelActor(GaussianModel):
             # Prune points outside the tracking box
             repeat_num = 2
             stds = self.get_scaling
-            stds = stds[:, None, :].expand(-1, repeat_num, -1) # [N, M, 1] 
+            stds = stds[:, None, :].expand(-1, repeat_num, -1) # [N, M, 3] 
             means = torch.zeros_like(self.get_xyz)
             means = means[:, None, :].expand(-1, repeat_num, -1) # [N, M, 3]
             samples = torch.normal(mean=means, std=stds) # [N, M, 3]

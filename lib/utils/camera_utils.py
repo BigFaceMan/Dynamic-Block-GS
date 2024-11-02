@@ -120,6 +120,7 @@ def loadmask(cam_info: CameraInfo, resolution, resize_mode):
         masks['original_acc_mask'] = resized_image_rgb[3:4, ...].clamp(0, 1).bool()
     else:
         if cam_info.mask is not None:
+            # print("has_img_mask")
             masks['original_mask'] = PILtoTorch(cam_info.mask, resolution, resize_mode=resize_mode).clamp(0, 1).bool()
         # else:
         #     masks['original_mask'] = None
@@ -136,6 +137,7 @@ def loadmask(cam_info: CameraInfo, resolution, resize_mode):
         #     masks['original_sky_mask'] = None    
         
         if 'obj_bound' in cam_info.metadata:
+            # print("has_obj_mask")
             masks['original_obj_bound'] = PILtoTorch(cam_info.metadata['obj_bound'], resolution, resize_mode=resize_mode).clamp(0, 1).bool()
             del cam_info.metadata['obj_bound']
         

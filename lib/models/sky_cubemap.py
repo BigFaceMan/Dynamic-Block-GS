@@ -27,11 +27,11 @@ class SkyCubeMap(nn.Module):
         self.sky_cube_map = nn.Parameter(base).requires_grad_(True)    
         
         # # TODO: change hard code here
-        # max_h, max_w = 1080, 1920
-        # if cfg.data.white_background:
-        #     self.sky_color = torch.ones((max_h, max_w, 3)).float().cuda()
-        # else:
-        #     self.sky_color = torch.zeros((max_h, max_w, 3)).float().cuda()    
+        max_h, max_w = 1280, 1920
+        if cfg.data.white_background:
+            self.sky_color = torch.ones((max_h, max_w, 3)).float().cuda()
+        else:
+            self.sky_color = torch.zeros((max_h, max_w, 3)).float().cuda()    
         
     def save_state_dict(self, is_final):
         state_dict = dict()
