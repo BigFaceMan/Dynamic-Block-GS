@@ -457,12 +457,14 @@ def generate_dataparser_outputs(
     obj_bounds = []
     # 先用dir中的，没有再用project的
     if has_dynamic_mask_dir:
+        print("有dynamic_mask_dir 用提供的即可")
         for idx, dynamic_mask_filename in enumerate(dynamic_mask_filenames):
             # Todo check bug
             obj_bound = np.array(Image.open(dynamic_mask_filename))
             # Fix bug 没加入bound
             obj_bounds.append(obj_bound) 
     else:
+        print("没有dynamic_mask_dir 用lidar project的")
         for i, image_filename in tqdm(enumerate(image_filenames)):
             cam = cams[i]
             h, w = image_heights[cam], image_widths[cam]

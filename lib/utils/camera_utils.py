@@ -146,8 +146,6 @@ def loadmask(cam_info: CameraInfo, resolution, resize_mode):
 def loadmetadata(metadata, resolution):
     output = copy.deepcopy(metadata)
 
-    
-
     # semantic
     if 'semantic' in metadata:
         output['semantic'] = NumpytoTorch(metadata['semantic'], resolution, resize_mode=Image.NEAREST)

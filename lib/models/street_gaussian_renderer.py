@@ -139,8 +139,17 @@ class StreetGaussianRenderer():
         # Step1: render foreground
         pc.set_visibility(include_list)
         pc.parse_camera(viewpoint_camera)
+
+        result = dict()
+        # aviod no gaussian case
+        if pc.num_gaussians == 0:
+            result["skip"] = True
+            return result
         
+
         result = self.render_kernel(viewpoint_camera, pc, convert_SHs_python, compute_cov3D_python, scaling_modifier, override_color)
+
+        result["skip"] = False
 
         # Step2: render sky
         if pc.include_sky:

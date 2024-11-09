@@ -713,9 +713,16 @@ class StreetGaussianModel(nn.Module):
             model: GaussianModel = getattr(self, model_name)
 
             scalars_, tensors_ = model.densify_and_prune(max_grad, min_opacity, prune_big_points)
-            if model_name == 'background':
+            # if model_name == 'background':
+            #     scalars = scalars_
+            #     tensors = tensors_
+            # Todo 变得具有扩展性
+            if scalars == None:
                 scalars = scalars_
                 tensors = tensors_
+            else:
+                scalars.update(scalars_)
+                tensors.update(tensors_)
     
         return scalars, tensors
     

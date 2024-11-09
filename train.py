@@ -61,6 +61,7 @@ def training():
     start_iter += 1
 
     viewpoint_stack = None
+    output_loss_info = True
     for iteration in range(start_iter, training_args.iterations + 1):
     
         iter_start.record()
@@ -91,23 +92,40 @@ def training():
         gt_image = viewpoint_cam.original_image.cuda()
         if hasattr(viewpoint_cam, 'original_mask'):
             mask = viewpoint_cam.original_mask.cuda().bool()
+            if output_loss_info:
+                print("use original_mask")
         else:
             mask = torch.ones_like(gt_image[0:1]).bool()
+            if output_loss_info:
+                print("use generate_ones_mask")
         
         if hasattr(viewpoint_cam, 'original_sky_mask'):
             sky_mask = viewpoint_cam.original_sky_mask.cuda()
+            if output_loss_info:
+                print("use original_sky_mask")
         else:
             sky_mask = None
+            if output_loss_info:
+                print("no sky_mask")
             
         if hasattr(viewpoint_cam, 'original_obj_bound'):
             obj_bound = viewpoint_cam.original_obj_bound.cuda().bool()
+            if output_loss_info:
+                print("use original_obj_bound")
         else:
             obj_bound = torch.zeros_like(gt_image[0:1]).bool()
+            if output_loss_info:
+                print("use generates_ones_objmask")
         
         if (iteration - 1) == training_args.debug_from:
             cfg.render.debug = True
             
         render_pkg = gaussians_renderer.render(viewpoint_cam, gaussians)
+
+        # skip no data case
+        if render_pkg["skip"] or torch.sum(mask).item() == 0:
+            continue ;
+        
         image, acc, viewspace_point_tensor, visibility_filter, radii = render_pkg["rgb"], render_pkg['acc'], render_pkg["viewspace_points"], render_pkg["visibility_filter"], render_pkg["radii"]
         depth = render_pkg['depth'] # [1, H, W]
 
@@ -117,6 +135,10 @@ def training():
         scalar_dict['l1_loss'] = Ll1.item()
         loss = (1.0 - optim_args.lambda_dssim) * optim_args.lambda_l1 * Ll1 + optim_args.lambda_dssim * (1.0 - ssim(image, gt_image, mask=mask))
 
+
+        if output_loss_info:
+            print("use rgb_loss")
+
         # sky loss
         if optim_args.lambda_sky > 0 and gaussians.include_sky and sky_mask is not None:
             acc = torch.clamp(acc, min=1e-6, max=1.-1e-6)
@@ -125,6 +147,9 @@ def training():
                 sky_loss *= optim_args.lambda_sky_scale[viewpoint_cam.meta['cam']]
             scalar_dict['sky_loss'] = sky_loss.item()
             loss += optim_args.lambda_sky * sky_loss
+
+            if output_loss_info:
+                print("use sky_loss")
 
         # semantic loss
         if optim_args.lambda_semantic > 0 and data_args.get('use_semantic', False) and 'semantic' in viewpoint_cam.meta:
@@ -141,6 +166,9 @@ def training():
                 )
             scalar_dict['semantic_loss'] = semantic_loss.item()
             loss += optim_args.lambda_semantic * semantic_loss
+
+            if output_loss_info:
+                print("use semantic_loss")
         
         if optim_args.lambda_reg > 0 and gaussians.include_obj and iteration >= optim_args.densify_until_iter:
             render_pkg_obj = gaussians_renderer.render_object(viewpoint_cam, gaussians)
@@ -156,6 +184,9 @@ def training():
                 -torch.log(1. - acc_obj)).mean()
             scalar_dict['obj_acc_loss'] = obj_acc_loss.item()
             loss += optim_args.lambda_reg * obj_acc_loss
+
+            if output_loss_info:
+                print("use obj_loss")
             # obj_acc_loss = -((acc_obj * torch.log(acc_obj) +  (1. - acc_obj) * torch.log(1. - acc_obj))).mean()
             # scalar_dict['obj_acc_loss'] = obj_acc_loss.item()
             # loss += optim_args.lambda_reg * obj_acc_loss
@@ -174,24 +205,36 @@ def training():
             else:
                 lidar_depth_loss = torch.zeros_like(Ll1)  
             loss += optim_args.lambda_depth_lidar * lidar_depth_loss
+
+            if output_loss_info:
+                print("use lidar_depth_loss")
                     
         # color correction loss
         if optim_args.lambda_color_correction > 0 and gaussians.use_color_correction:
             color_correction_reg_loss = gaussians.color_correction.regularization_loss(viewpoint_cam)
             scalar_dict['color_correction_reg_loss'] = color_correction_reg_loss.item()
             loss += optim_args.lambda_color_correction * color_correction_reg_loss
+
+            if output_loss_info:
+                print("use color_correction_loss")
         
         # pose correction loss
         if optim_args.lambda_pose_correction > 0 and gaussians.use_pose_correction:
             pose_correction_reg_loss = gaussians.pose_correction.regularization_loss()
             scalar_dict['pose_correction_reg_loss'] = pose_correction_reg_loss.item()
             loss += optim_args.lambda_pose_correction * pose_correction_reg_loss
+
+            if output_loss_info:
+                print("use pose_correction_loss")
                     
         # scale flatten loss
         if optim_args.lambda_scale_flatten > 0:
             scale_flatten_loss = gaussians.background.scale_flatten_loss()
             scalar_dict['scale_flatten_loss'] = scale_flatten_loss.item()
             loss += optim_args.lambda_scale_flatten * scale_flatten_loss
+
+            if output_loss_info:
+                print("use scale_flatten_loss")
         
         # opacity sparse loss
         if optim_args.lambda_opacity_sparse > 0:
@@ -202,6 +245,9 @@ def training():
             sparse_loss = -1 * (log_opacity + log_one_minus_opacity)[visibility_filter].mean()
             scalar_dict['opacity_sparse_loss'] = sparse_loss.item()
             loss += optim_args.lambda_opacity_sparse * sparse_loss
+
+            if output_loss_info:
+                print("use opacity_sparse_loss")
                 
         # normal loss
         if optim_args.lambda_normal_mono > 0 and 'mono_normal' in viewpoint_cam.meta and 'normals' in render_pkg:
@@ -223,6 +269,9 @@ def training():
             scalar_dict['normal_cos_loss'] = normal_cos_loss.item()
             normal_loss = normal_l1_loss + normal_cos_loss
             loss += optim_args.lambda_normal_mono * normal_loss
+
+            if output_loss_info:
+                print("use normal_loss")
             
         scalar_dict['loss'] = loss.item()
 
@@ -231,6 +280,7 @@ def training():
         iter_end.record()
                 
         is_save_images = True
+        output_loss_info = False
         if is_save_images and (iteration % 1000 == 0):
             # row0: gt_image, image, depth
             # row1: acc, image_obj, acc_obj

@@ -1,6 +1,6 @@
 task: waymo_full_exp
 source_path: /lfs3/users/spsong/dataset/waymo/training/002
-exp_name: waymo_train_002_objs
+exp_name: waymo_train_002_objs_8reg
 
 data:
   split_test: -1
@@ -69,7 +69,7 @@ optim:
   lambda_sky: 0.05
   lambda_sky_scale: [1, 1, 0]
   lambda_mask: 0.1
-  lambda_reg: 0.1
+  lambda_reg: 0.8
   lambda_depth_lidar: 0.1
 
   track_position_lr_delay_mult: 0.01
