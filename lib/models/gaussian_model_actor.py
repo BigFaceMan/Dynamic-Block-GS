@@ -263,6 +263,7 @@ class GaussianModelActor(GaussianModel):
             grads = self.xyz_gradient_accum[:, 0:1] / self.denom
         
         grads[grads.isnan()] = 0.0
+        print(f'{self.model_name} : Number of current gaussians: {self.get_xyz.shape[0]}')
 
         # Clone and Split
         # extent = self.get_extent()
@@ -301,6 +302,8 @@ class GaussianModelActor(GaussianModel):
             prune_mask = torch.logical_or(prune_mask, points_outside_box)
             
         self.prune_points(prune_mask)
+
+        print(f'Number of pruned gaussians: {prune_mask.sum()}')
         
         # Reset
         self.xyz_gradient_accum = torch.zeros((self.get_xyz.shape[0], 2), device="cuda")

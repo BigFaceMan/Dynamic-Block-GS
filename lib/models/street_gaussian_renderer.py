@@ -50,7 +50,7 @@ class StreetGaussianRenderer():
     ):        
         pc.set_visibility(include_list=pc.obj_list)
         pc.parse_camera(viewpoint_camera)
-        
+        # Todo 弄清楚白背景是什么
         result = self.render_kernel(viewpoint_camera, pc, convert_SHs_python, compute_cov3D_python, scaling_modifier, override_color, white_background=True)
 
         return result

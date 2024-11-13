@@ -1,7 +1,7 @@
 '''
 Author: ssp
 Date: 2024-10-23 21:14:25
-LastEditTime: 2024-11-02 10:20:01
+LastEditTime: 2024-11-11 15:02:40
 '''
 import torch
 import torch.nn as nn
@@ -703,6 +703,35 @@ class StreetGaussianModel(nn.Module):
             model.xyz_gradient_accum[visibility_model, 0:1] += torch.norm(viewspace_point_tensor_grad_model[visibility_model, :2], dim=-1, keepdim=True)
             model.xyz_gradient_accum[visibility_model, 1:2] += torch.norm(viewspace_point_tensor_grad_model[visibility_model, 2:], dim=-1, keepdim=True)
             model.denom[visibility_model] += 1
+        
+    def prune_min_opacity(self, min_opacity, exclude_list=[]):
+        '''
+        description : 删除不透明度低的点
+        param [*] self :
+        param [*] min_opacity : 删除的阈值
+        param [*] exclude_list :
+        return [*]
+        '''
+        scalars = None
+        tensors = None
+        for model_name in self.model_name_id.keys():
+            if startswith_any(model_name, exclude_list):
+                continue
+            model: GaussianModel = getattr(self, model_name)
+
+            scalars_, tensors_ = model.prune_min_opacity(min_opacity)
+            # if model_name == 'background':
+            #     scalars = scalars_
+            #     tensors = tensors_
+            # Todo 变得具有扩展性
+            if scalars == None:
+                scalars = scalars_
+                tensors = tensors_
+            else:
+                scalars.update(scalars_)
+                tensors.update(tensors_)
+    
+        return scalars, tensors
         
     def densify_and_prune(self, max_grad, min_opacity, prune_big_points, exclude_list=[]):
         scalars = None

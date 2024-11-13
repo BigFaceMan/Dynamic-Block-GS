@@ -16,7 +16,9 @@ class StreetGaussianVisualizer():
         os.makedirs(self.result_dir, exist_ok=True)
         
         self.save_video = cfg.render.save_video
-        self.save_image = cfg.render.save_image
+        # self.save_image = cfg.render.save_image
+        self.save_image = True
+        print("save_img : ", self.save_image)
         
         self.rgbs_gt = []
         self.rgbs = []
@@ -100,8 +102,11 @@ class StreetGaussianVisualizer():
         rgb_gt = rgb_gt.permute(1, 2, 0).numpy() # [H, W, 3]
         diff = ((rgb - rgb_gt) ** 2).sum(axis=-1, keepdims=True) # [H, W, 1]
         
-        if self.save_image:
-            imageio.imwrite(os.path.join(self.result_dir, f'{name}_diff.png'), self.diff_visualize_func(diff))
+        try:
+            if self.save_image:
+                imageio.imwrite(os.path.join(self.result_dir, f'{name}_diff.png'), self.diff_visualize_func(diff))
+        except:
+            print("diff depth have bug")
         
         if self.save_video:
             self.diffs.append(diff)

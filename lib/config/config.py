@@ -5,6 +5,7 @@ import numpy as np
 
 from lib.utils.cfg_utils import make_cfg
 
+
 cfg = CN()
 
 cfg.workspace = os.environ['PWD']
@@ -62,6 +63,8 @@ cfg.optim.densify_until_iter = 15000
 cfg.optim.densify_grad_threshold = 0.0002 # densify_grad_threshold_{bkgd, obj ...}
 cfg.optim.densify_grad_abs_bkgd = False # densification strategy from AbsGS
 cfg.optim.densify_grad_abs_obj = False 
+cfg.optim.prune_min_opacity_iter = 35000 # 去除伪影
+cfg.optim.prune_min_opacity_interval = 100 # 去除伪影
 cfg.optim.max_screen_size = 20
 cfg.optim.min_opacity = 0.005
 cfg.optim.percent_big_ws = 0.1

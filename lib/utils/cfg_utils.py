@@ -6,9 +6,11 @@ def parse_cfg(cfg, args):
     if len(cfg.task) == 0:
         raise ValueError('task must be specified')
 
+    # bug Todo 确定了cuda是啥
     # assign the gpus
-    if -1 not in cfg.gpus:
-        os.environ['CUDA_VISIBLE_DEVICES'] = ', '.join([str(gpu) for gpu in cfg.gpus])
+    # if -1 not in cfg.gpus:
+    #     print("here !!!!!!!!!!!!!!!!!!!!!!!!!!")
+    #     os.environ['CUDA_VISIBLE_DEVICES'] = ', '.join([str(gpu) for gpu in cfg.gpus])
 
     if cfg.debug:
         os.environ["PYTHONBREAKPOINT"] = "pdbr.set_trace"

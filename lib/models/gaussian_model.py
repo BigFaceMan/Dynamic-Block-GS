@@ -520,6 +520,19 @@ class GaussianModel(nn.Module):
             "semantic" : new_semantic,
         })
         
+    def prune_min_opacity(self, min_opacity):
+        print(f'Number of current gaussians: {self.get_xyz.shape[0]}')
+        # Prune 
+        prune_mask = (self.get_opacity < min_opacity).squeeze()
+
+        self.prune_points(prune_mask)
+        self.scalar_dict['points_pruned'] = prune_mask.sum().item()            
+        print(f'Number of pruned_min_opacity gaussians: {prune_mask.sum()}')
+        torch.cuda.empty_cache()
+        
+        return self.scalar_dict, self.tensor_dict
+        
+    
     def densify_and_prune(self, max_grad, min_opacity, extent, max_screen_size):
         grads = self.xyz_gradient_accum[:, 0:1] / self.denom
         grads[grads.isnan()] = 0.0

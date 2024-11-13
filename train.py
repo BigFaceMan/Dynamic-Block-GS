@@ -170,26 +170,48 @@ def training():
             if output_loss_info:
                 print("use semantic_loss")
         
+        # bkground reg
+        # 会把很多点给删除掉
+        # 只用背景的去做loss
         if optim_args.lambda_reg > 0 and gaussians.include_obj and iteration >= optim_args.densify_until_iter:
             render_pkg_obj = gaussians_renderer.render_object(viewpoint_cam, gaussians)
             image_obj, acc_obj = render_pkg_obj["rgb"], render_pkg_obj['acc']
             acc_obj = torch.clamp(acc_obj, min=1e-6, max=1.-1e-6)
 
-            # box_reg_loss = gaussians.get_box_reg_loss()
-            # scalar_dict['box_reg_loss'] = box_reg_loss.item()
-            # loss += optim_args.lambda_reg * box_reg_loss
-
-            obj_acc_loss = torch.where(obj_bound, 
-                -(acc_obj * torch.log(acc_obj) +  (1. - acc_obj) * torch.log(1. - acc_obj)), 
-                -torch.log(1. - acc_obj)).mean()
+            # 将 obj_bound 为 0 的位置设置为 -torch.log(1. - acc_obj)
+            # 只回传给背景位置的点
+            obj_acc_loss = torch.where(obj_bound, torch.tensor(0.0, device=obj_bound.device), -torch.log(1. - acc_obj))
+            # 只计算 obj_bound 为 0 的位置的均值
+            obj_acc_loss = obj_acc_loss[~obj_bound].mean()
+            # obj_acc_loss = torch.where(obj_bound, 
+            #     -(acc_obj * torch.log(acc_obj) +  (1. - acc_obj) * torch.log(1. - acc_obj)), 
+            #     -torch.log(1. - acc_obj)).mean()
             scalar_dict['obj_acc_loss'] = obj_acc_loss.item()
             loss += optim_args.lambda_reg * obj_acc_loss
 
             if output_loss_info:
                 print("use obj_loss")
-            # obj_acc_loss = -((acc_obj * torch.log(acc_obj) +  (1. - acc_obj) * torch.log(1. - acc_obj))).mean()
-            # scalar_dict['obj_acc_loss'] = obj_acc_loss.item()
-            # loss += optim_args.lambda_reg * obj_acc_loss
+
+        # if optim_args.lambda_reg > 0 and gaussians.include_obj and iteration >= optim_args.densify_until_iter:
+        #     render_pkg_obj = gaussians_renderer.render_object(viewpoint_cam, gaussians)
+        #     image_obj, acc_obj = render_pkg_obj["rgb"], render_pkg_obj['acc']
+        #     acc_obj = torch.clamp(acc_obj, min=1e-6, max=1.-1e-6)
+
+        #     # box_reg_loss = gaussians.get_box_reg_loss()
+        #     # scalar_dict['box_reg_loss'] = box_reg_loss.item()
+        #     # loss += optim_args.lambda_reg * box_reg_loss
+
+        #     obj_acc_loss = torch.where(obj_bound, 
+        #         -(acc_obj * torch.log(acc_obj) +  (1. - acc_obj) * torch.log(1. - acc_obj)), 
+        #         -torch.log(1. - acc_obj)).mean()
+        #     scalar_dict['obj_acc_loss'] = obj_acc_loss.item()
+        #     loss += optim_args.lambda_reg * obj_acc_loss
+
+        #     if output_loss_info:
+        #         print("use obj_loss")
+        #     # obj_acc_loss = -((acc_obj * torch.log(acc_obj) +  (1. - acc_obj) * torch.log(1. - acc_obj))).mean()
+        #     # scalar_dict['obj_acc_loss'] = obj_acc_loss.item()
+        #     # loss += optim_args.lambda_reg * obj_acc_loss
         
         # lidar depth loss
         if optim_args.lambda_depth_lidar > 0 and 'lidar_depth' in viewpoint_cam.meta:            
@@ -343,6 +365,14 @@ def training():
                         scalar_dict.update(scalars)
                         tensor_dict.update(tensors)
                         
+            elif iteration < optim_args.prune_min_opacity_iter:
+                    if iteration % optim_args.prune_min_opacity_interval == 0:
+                        scalars, tensors = gaussians.prune_min_opacity(
+                            min_opacity=optim_args.min_opacity
+                        )
+
+                        scalar_dict.update(scalars)
+                        tensor_dict.update(tensors)
             # Reset opacity
             if iteration < optim_args.densify_until_iter:
                 if iteration % optim_args.opacity_reset_interval == 0:
@@ -450,9 +480,12 @@ def training_report(tb_writer, iteration, scalar_stats, tensor_stats, testing_it
 
 if __name__ == "__main__":
     print("Optimizing " + cfg.model_path)
+    # print(torch.cuda.current_device())  # 打印当前设备编号
+    # print(torch.cuda.get_device_name(torch.cuda.current_device()))  # 打印当前设备名称
 
     # Initialize system state (RNG)
     safe_state(cfg.train.quiet)
+
 
     # Start GUI server, configure and run training
     # torch.autograd.set_detect_anomaly(cfg.train.detect_anomaly)

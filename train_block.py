@@ -152,9 +152,19 @@ def training():
             # scalar_dict['box_reg_loss'] = box_reg_loss.item()
             # loss += optim_args.lambda_reg * box_reg_loss
 
-            obj_acc_loss = torch.where(obj_bound, 
-                -(acc_obj * torch.log(acc_obj) +  (1. - acc_obj) * torch.log(1. - acc_obj)), 
-                -torch.log(1. - acc_obj)).mean()
+            # obj_acc_loss = torch.where(obj_bound, 
+            #     -(acc_obj * torch.log(acc_obj) +  (1. - acc_obj) * torch.log(1. - acc_obj)), 
+            #     -torch.log(1. - acc_obj)).mean()
+
+            # pre
+            # obj_acc_loss = torch.where(obj_bound, 
+            #     -(acc_obj * torch.log(acc_obj) +  (1. - acc_obj) * torch.log(1. - acc_obj)), 
+            #     -torch.log(1. - acc_obj)).mean()
+
+            # 将 obj_bound 为 0 的位置设置为 -torch.log(1. - acc_obj)
+            obj_acc_loss = torch.where(obj_bound, torch.tensor(0.0, device=obj_bound.device), -torch.log(1. - acc_obj))
+            # 只计算 obj_bound 为 0 的位置的均值
+            obj_acc_loss = obj_acc_loss[~obj_bound].mean()
             scalar_dict['obj_acc_loss'] = obj_acc_loss.item()
             loss += optim_args.lambda_reg * obj_acc_loss
             # obj_acc_loss = -((acc_obj * torch.log(acc_obj) +  (1. - acc_obj) * torch.log(1. - acc_obj))).mean()
