@@ -1,6 +1,0 @@
-/lfs1/users/spsong/Code/Dynamic-Block-GS/build/CMakeFiles/edit_cache.dir
-/lfs1/users/spsong/Code/Dynamic-Block-GS/build/CMakeFiles/rebuild_cache.dir
-/lfs1/users/spsong/Code/Dynamic-Block-GS/build/CMakeFiles/list_install_components.dir
-/lfs1/users/spsong/Code/Dynamic-Block-GS/build/CMakeFiles/install.dir
-/lfs1/users/spsong/Code/Dynamic-Block-GS/build/CMakeFiles/install/local.dir
-/lfs1/users/spsong/Code/Dynamic-Block-GS/build/CMakeFiles/install/strip.dir
