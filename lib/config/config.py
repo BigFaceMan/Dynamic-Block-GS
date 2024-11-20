@@ -29,8 +29,8 @@ cfg.resolution_scales = [1]
 cfg.eval = CN()
 cfg.eval.skip_train = False 
 cfg.eval.skip_test = False 
-cfg.eval.eval_train = False
-cfg.eval.eval_test = True
+cfg.eval.eval_train = True
+cfg.eval.eval_test = False
 cfg.eval.quiet = False
 
 cfg.train = CN()
@@ -43,6 +43,9 @@ cfg.train.quiet = False
 cfg.train.checkpoint_iterations = [30000]
 cfg.train.start_checkpoint = None
 cfg.train.importance_sampling = False
+
+cfg.train.waymo_pose = False
+cfg.train.waymo_point = False
 
 cfg.optim = CN()
 # learning rate

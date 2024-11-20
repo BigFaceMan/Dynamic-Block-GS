@@ -5,7 +5,7 @@ exp_name: waymo_train_002_0_198_colmap_bkg_pose
 data:
   split_test: -1
   split_train: 1
-  type: Colmap
+  type: Colmap_test
   white_background: false
   selected_frames: [0, 198]
   cameras: [0, 1, 2]
@@ -35,7 +35,7 @@ model:
     opt_track: false
 
 train:
-  waymo_pose: false
+  waymo_pose: true
   waymo_point: false
   iterations: 50000
   test_iterations: [7000, 30000, 50000]

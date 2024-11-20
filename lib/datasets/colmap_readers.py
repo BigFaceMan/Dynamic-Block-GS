@@ -12,6 +12,7 @@ from lib.datasets.base_readers import CameraInfo, SceneInfo, getNerfppNorm, fetc
 def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
     cam_infos = []
     sky_mask_folder = os.path.join(images_folder[:-len(os.path.basename(images_folder))], 'sky_mask')
+    have_sky_mask = os.path.exists(sky_mask_folder)
     print("Colmap sky_mask_folder : ", sky_mask_folder)
     for idx, key in enumerate(cam_extrinsics):
         sys.stdout.write('\r')
@@ -68,6 +69,7 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         try:
             # images
             mask_path = os.path.join(os.path.dirname(images_folder), "mask", extr.name)
+            # print("\nmask_path : ", mask_path)
             # print("mask path is : ", mask_path)
             img_mask = Image.open(mask_path).convert("L")  
             # print("mask shape is : ", np.array(mask).shape)
@@ -76,13 +78,12 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
         metadata = {}
 
         # read sky_mask
-        try:
+        if have_sky_mask:
             sky_mask_path = os.path.join(sky_mask_folder, extr.name)
             sky_mask = (cv2.imread(sky_mask_path)[..., 0]) > 0.
             sky_mask = Image.fromarray(sky_mask)
             metadata['sky_mask'] = sky_mask
-        except:
-            metadata['sky_mask'] = None
+
         # 第几个相机，为后面优化天空做准备
         metadata['cam'] = 0
 
@@ -94,7 +95,7 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
     return cam_infos
 
 
-def readColmapSceneInfo(path, images='images', split_test=8, **kwargs):
+def readColmapSceneInfo(path, scene_info_waymo: SceneInfo=None, images='images', split_test=8, **kwargs):
     colmap_basedir = os.path.join(path, 'sparse/0')
     if not os.path.exists(colmap_basedir):
         colmap_basedir = os.path.join(path, 'sparse')
@@ -136,6 +137,13 @@ def readColmapSceneInfo(path, images='images', split_test=8, **kwargs):
         pcd = fetchPly(ply_path)
     except:
         pcd = None
+    if scene_info_waymo != None and cfg.train.waymo_point:
+        print("<< this colmap train use waymo pcd >>")
+        pcd = scene_info_waymo.point_cloud
+    if scene_info_waymo != None and cfg.train.waymo_pose:
+        print("<< this colmap train use waymo pose >>")
+        train_cam_infos = scene_info_waymo.train_cameras
+        
 
     scene_metadata = dict()
 

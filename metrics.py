@@ -59,7 +59,8 @@ def evaluate(split='test'):
         image_names = []
 
         for cam_info in tqdm(cam_infos, desc="Reading image progress"):
-            image_name = cam_info.image_name
+            image_name = cam_info.image_name.split('.')[0]
+            print("image_name : ", image_name)
             render_path = test_dir / method / f'{image_name}_rgb.png'
             gt_path = test_dir / method / f'{image_name}_gt.png'
             

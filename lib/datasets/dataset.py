@@ -1,7 +1,7 @@
 '''
 Author: ssp
 Date: 2024-10-23 21:14:25
-LastEditTime: 2024-11-18 11:30:31
+LastEditTime: 2024-11-20 20:11:52
 '''
 import os
 import random
@@ -32,9 +32,14 @@ class Dataset():
         self.vis_obj_cameras = {}
 
         dataset_type = cfg.data.get('type', "Colmap")
-        assert dataset_type in sceneLoadTypeCallbacks.keys(), 'Could not recognize scene type!'
-        
-        scene_info: SceneInfo = sceneLoadTypeCallbacks[dataset_type](self.source_path, **cfg.data)
+        if dataset_type == "Colmap_test":
+            dataset_type = "Waymo"
+            scene_info_waymo: SceneInfo = sceneLoadTypeCallbacks[dataset_type]("/lfs3/users/spsong/dataset/waymo/training/002", **cfg.data)
+            dataset_type = "Colmap"
+            scene_info: SceneInfo = sceneLoadTypeCallbacks[dataset_type](self.source_path, scene_info_waymo=scene_info_waymo, **cfg.data)
+        else:
+            assert dataset_type in sceneLoadTypeCallbacks.keys(), 'Could not recognize scene type!'
+            scene_info: SceneInfo = sceneLoadTypeCallbacks[dataset_type](self.source_path, **cfg.data)
 
         if cfg.mode == 'train':
             print(f'Saving input pointcloud to {os.path.join(self.model_path, "input.ply")}')
