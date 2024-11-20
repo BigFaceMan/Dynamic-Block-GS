@@ -153,9 +153,11 @@ class StreetGaussianRenderer():
 
         # Step2: render sky
         if pc.include_sky:
-            sky_color = pc.sky_cubemap(viewpoint_camera, result['acc'].detach())
-
-            result['rgb'] = result['rgb'] + sky_color * (1 - result['acc'])
+            try:
+                sky_color = pc.sky_cubemap(viewpoint_camera, result['acc'].detach())
+                result['rgb'] = result['rgb'] + sky_color * (1 - result['acc'])
+            except:
+                print("sky_color bug : ", viewpoint_camera.image_name)
 
         if pc.use_color_correction:
             result['rgb'] = pc.color_correction(viewpoint_camera, result['rgb'])

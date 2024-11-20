@@ -1,5 +1,7 @@
 import os
 import torch
+import glob
+import multiprocessing as mp
 from random import randint
 from lib.utils.loss_utils import l1_loss, l2_loss, psnr, ssim
 from lib.utils.img_utils import save_img_torch, visualize_depth_numpy
@@ -282,7 +284,7 @@ def training():
             # Log and save
             if (iteration in training_args.save_iterations):
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
-                scene.save(iteration)
+                scene.save_block(iteration)
 
             # Densification
             if iteration < optim_args.densify_until_iter:
@@ -321,7 +323,7 @@ def training():
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
                 state_dict = gaussians.save_state_dict(is_final=(iteration == training_args.iterations))
                 state_dict['iter'] = iteration
-                ckpt_path = os.path.join(cfg.trained_model_dir, f'iteration_{iteration}.pth')
+                ckpt_path = os.path.join(cfg.trained_model_dir, f'{cfg.block.partition_id}_iteration_{iteration}.pth')
                 torch.save(state_dict, ckpt_path)
 
 
@@ -408,6 +410,17 @@ def training_report(tb_writer, iteration, scalar_stats, tensor_stats, testing_it
             tb_writer.add_histogram("test/opacity_histogram", scene.gaussians.get_opacity, iteration)
             tb_writer.add_scalar('test/points_total', scene.gaussians.get_xyz.shape[0], iteration)
         torch.cuda.empty_cache()
+        
+def parallel_local_training(gpu_id, partition_id):
+    torch.cuda.set_device(gpu_id)
+
+    partition_model_path =  f"{cfg.model_path}/partition_point_cloud/visible"
+    cfg.block.partition_id = partition_id
+    cfg.block.partition_model_path = partition_model_path
+    print("partition_id : ", cfg.block.partition_id)
+    print("partition_model_path : ", cfg.block.partition_model_path)
+
+    training()
 
 if __name__ == "__main__":
     print("Optimizing " + cfg.model_path)
@@ -415,12 +428,79 @@ if __name__ == "__main__":
     # Initialize system state (RNG)
     safe_state(cfg.train.quiet)
 
+    # train multi gpu
+    mp.set_start_method('spawn', force=True)
 
     partition_num, partition_id_list = data_partition()
+    # 分块的type
+    cfg.data.type = "PartitonWaymo"
 
-    # Start GUI server, configure and run training
-    # torch.autograd.set_detect_anomaly(cfg.train.detect_anomaly)
-    # training()
+    # cuda_devices_id = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+    cuda_devices_id = [0, 1, 2, 3]
+    cuda_devices = len(cuda_devices_id)
+    print(f"found {cuda_devices} cuda devices")
+    print(f"cuda devices_id is ", cuda_devices_id)
+    training_round = partition_num // cuda_devices
+    remainder = partition_num % cuda_devices
+
+    # main loops
+    for i in range(training_round):
+        partition_pool = [i + training_round * j for j in range(cuda_devices)]
+
+        processes = []
+        for index, device_id in enumerate(range(cuda_devices)):
+            device_id = cuda_devices_id[device_id]
+            partition_index = partition_pool[index]
+            partition_id = partition_id_list[partition_index]
+            print("train partition {} on gpu {}".format(partition_id, device_id))
+            p = mp.Process(target=parallel_local_training, name=f"partition_{partition_id}",
+                        args=(device_id, partition_id))
+            processes.append(p)
+            p.start()
+
+        for p in processes:
+            p.join()  # 等待所有进程完成
+            # processes = []
+
+        torch.cuda.empty_cache()
+
+    if remainder != 0:
+        partition_pool = [cuda_devices * training_round + i for i in range(remainder)]
+        processes = []
+        for index, device_id in enumerate(range(cuda_devices)[:remainder]):
+            # torch.cuda.set_device(device_id)
+            device_id = cuda_devices_id[device_id]
+            partition_index = partition_pool[index]
+            partition_id = partition_id_list[partition_index]
+            print("train partition {} on gpu {}".format(partition_id, device_id))
+            p = mp.Process(target=parallel_local_training, name=f"partition_{partition_id}",
+                        args=(device_id, partition_id))
+
+            processes.append(p)
+            p.start()
+
+        for p in processes:
+            p.join()
+
+        torch.cuda.empty_cache()
+    print("\nTraining complete.")
+
+    # seamless_merging 无缝合并
+    print("Merging Partitions...")
+
+    # point_cloud_path = os.path.join(cfg.point_cloud_dir, f"iteration_{iteration}", f"{cfg.block.partition_id}_point_cloud.ply")
+    all_point_cloud_dir = glob(os.path.join(cfg.point_cloud_dir, "*"))
+
+    for point_cloud_dir in all_point_cloud_dir:
+        seamless_merge(cfg.model_path, point_cloud_dir)
+
+    # GS_train
+    # pre_training(lp, op, pp, args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
+
+
+    # All done
+    print("All Done!")
+
 
     # All done
     print("\nTraining complete.")

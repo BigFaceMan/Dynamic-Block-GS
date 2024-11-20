@@ -38,7 +38,7 @@ train:
   iterations: 50000
   test_iterations: [7000, 30000, 50000]
   save_iterations: [25000, 50000]
-  checkpoint_iterations: [50000]
+  checkpoint_iterations: [25000, 50000]
 
 optim:
   prune_box_interval: 100

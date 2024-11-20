@@ -67,6 +67,7 @@ cfg.optim.prune_min_opacity_iter = 35000 # 去除伪影
 cfg.optim.prune_min_opacity_interval = 100 # 去除伪影
 cfg.optim.max_screen_size = 20
 cfg.optim.min_opacity = 0.005
+cfg.optim.post_min_opacity = 0.001
 cfg.optim.percent_big_ws = 0.1
 # loss weight
 cfg.optim.lambda_l1 = 1.
@@ -148,6 +149,10 @@ cfg.render.coord = 'world' # ['world', 'vehicle']
 cfg.render.concat_cameras = []
 cfg.viewer = CN()
 cfg.viewer.frame_id = 0 # Select the frame_id (start from 0) to save for viewer
+
+cfg.block = CN()
+cfg.block.partition_id = "-1"
+cfg.block.partition_model_path = "-1"
 
 
 parser = argparse.ArgumentParser()

@@ -194,7 +194,8 @@ class ProgressiveDataPartitioning:
             if data_vis:
                 self.draw_partition(partition_list)
             # 基于可视性 扩展
-            self.partition_scene = self.Visibility_based_camera_selection(partition_list)  # 输出经过可见性筛选后的场景 包括相机和点云 输出colmap看到的点云或直接融合的
+            # self.partition_scene = self.Visibility_based_camera_selection(partition_list)  # 输出经过可见性筛选后的场景 包括相机和点云 输出colmap看到的点云或直接融合的
+            self.partition_scene = self.Visibility_based_camera_selection_waymo(partition_list)  # 输出经过可见性筛选后的场景 包括相机和点云 输出colmap看到的点云或直接融合的
             # self.partition_scene = self.pre_Visibility_based_camera_selection(partition_list)  # 输出经过可见性筛选后的场景 包括相机和点云
             if data_vis:
                 for data_i in self.partition_scene:
@@ -573,6 +574,97 @@ class ProgressiveDataPartitioning:
         )))[0]
 
         return points_img, points_img[mask], mask
+
+
+    def Visibility_based_camera_selection_waymo(self, partition_list):
+        """
+        由于基本上是直线的场景，因此需要特殊处理, 不加可视处理，只用扩展20%的点作为分块点
+        """
+        # 复制一份新的变量，用于添加可视相机后的每个部分的所有相机
+        # 防止相机和点云被重复添加
+        add_visible_camera_partition_list = copy.deepcopy(partition_list)
+        client = 0
+        try:
+            # 加载 img_name2BPC
+            with open(os.path.join(self.source_path, "img_name2BPC.pkl"), "rb") as f:
+                img_name2BPC = pickle.load(f)
+        except:
+                print("No img_name -> BPC mapping")
+                img_name2BPC = None
+            
+
+        for idx, partition_i in enumerate(partition_list):  # 第i个partition
+            new_points = []  # 提前创建空的数组 用于保存新增的点
+            new_colors = []
+            new_normals = []
+
+            pcd_i = partition_i.point_cloud
+            partition_id_i = partition_i.partition_id  # 获取当前partition的编号
+            # 获取当前partition中点云围成的边界框的8角坐标
+            partition_ori_point_bbox = partition_i.ori_point_bbox
+            partition_extend_point_bbox = partition_i.extend_point_bbox
+            ori_8_corner_points = self.get_8_corner_points(partition_ori_point_bbox)  # 获取点云围成的边界的8个角点的坐标
+            extent_8_corner_points = self.get_8_corner_points(partition_extend_point_bbox)
+
+            corner_points = []
+            for point in extent_8_corner_points.values():
+                corner_points.append(point)
+            storePly(os.path.join(self.partition_extend_dir, f'{partition_id_i}_corner_points.ply'),
+                     np.array(corner_points),
+                     np.zeros_like(np.array(corner_points)))
+
+            camera_centers = []
+            for camera_pose in add_visible_camera_partition_list[idx].cameras:
+                camera_centers.append(camera_pose.pose)
+
+            # 保存相机坐标，用于可视化相机位置
+            storePly(os.path.join(self.partition_visible_dir, f'{partition_id_i}_camera_centers.ply'), np.array(camera_centers),
+                    np.zeros_like(np.array(camera_centers)))
+
+            # 点云去重
+            point_cloud = add_visible_camera_partition_list[idx].point_cloud
+            print("No visible points size : ", point_cloud.points.shape[0])
+            # 加入原本的点云
+            new_points.append(point_cloud.points)
+            # print("pcd xyz type : ", type(point_cloud.points[0, 0]))
+            new_colors.append(point_cloud.colors)
+            new_normals.append(point_cloud.normals)
+
+            new_points = np.concatenate(new_points, axis=0)
+            new_colors = np.concatenate(new_colors, axis=0)
+            new_normals = np.concatenate(new_normals, axis=0)
+            # print("after merge visible points size : ", new_points.shape[0])
+            # 去重
+            new_points, mask = np.unique(new_points, return_index=True, axis=0)
+            new_colors = new_colors[mask]
+            new_normals = new_normals[mask]
+            print("after maks points size : ", new_points.shape[0])
+
+            # 当第j部分所有相机都筛选完之后，更新最终的点云
+            add_visible_camera_partition_list[idx] = add_visible_camera_partition_list[idx]._replace(
+                point_cloud=BasicPointCloud(points=new_points, colors=new_colors,
+                                            normals=new_normals))  # 更新点云，新增的点云有许多重复的点，需要在后面剔除掉
+            storePly(os.path.join(self.partition_visible_dir, f"{partition_id_i}_visible.ply"), new_points,
+                     new_colors)  # 保存可见性选择后每个partition的点云
+
+        return add_visible_camera_partition_list
+
+    def ori_boxes_select(self, partition_list):
+        """3.基于可见性的相机选择 和 基于覆盖率的点选择
+            只用extendbbox 来分块训练
+        :param visible_rate: 能见度阈值 默认为0.25 同论文
+        """
+        # 复制一份新的变量，用于添加可视相机后的每个部分的所有相机
+        # 防止相机和点云被重复添加
+        add_visible_camera_partition_list = copy.deepcopy(partition_list)
+
+        for idx, partition_i in tqdm(enumerate(partition_list), total=len(partition_list), desc="Process extenbbox"):  # 第i个partition
+            pcd_i = partition_i.point_cloud
+            partition_id_i = partition_i.partition_id  # 获取当前partition的编号
+            storePly(os.path.join(self.partition_visible_dir, f"{partition_id_i}_visible.ply"), pcd_i.points,
+                     pcd_i.colors)  # 保存可见性选择后每个partition的点云
+
+        return add_visible_camera_partition_list
 
 
     def Visibility_based_camera_selection(self, partition_list):

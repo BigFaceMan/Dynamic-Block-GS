@@ -26,7 +26,7 @@ class BaseVisualizer():
         self.diff_visualize_func = lambda x: visualize_depth_numpy(x, cmap=cv2.COLORMAP_TURBO)[0][..., [2, 1, 0]]
 
     def visualize(self, result, camera: Camera):
-        name = camera.image_name
+        name = camera.image_name.split('.')[0]
         rgb = result['rgb']
 
         if self.save_image:
@@ -41,7 +41,7 @@ class BaseVisualizer():
         self.visualize_depth(result, camera)
     
     def visualize_diff(self, result, camera: Camera):
-        name = camera.image_name
+        name = camera.image_name.split('.')[0]
         rgb_gt = camera.original_image[:3]
         rgb = result['rgb'].detach().cpu()  
               
@@ -64,7 +64,7 @@ class BaseVisualizer():
             self.diffs.append(diff)
 
     def visualize_depth(self, result, camera: Camera):
-        name = camera.image_name
+        name = camera.image_name.split('.')[0]
         depth = result['depth']
 
         depth = depth.detach().permute(1, 2, 0).detach().cpu().numpy() # [H, W, 1]

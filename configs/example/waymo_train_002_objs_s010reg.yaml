@@ -1,7 +1,7 @@
 task: waymo_full_exp
 source_path: /lfs3/users/spsong/dataset/waymo/training/002
 exp_name: waymo_train_002_objs_s010reg
-loaded_iter: 25000
+loaded_iter: 51000
 data:
   split_test: -1
   split_train: 1
@@ -55,6 +55,7 @@ optim:
   feature_lr: 0.0025
   max_screen_size: 20
   min_opacity: 0.005
+  post_min_opacity: 0.001
   opacity_lr: 0.05
   opacity_reset_interval: 3000
   percent_big_ws: 0.1

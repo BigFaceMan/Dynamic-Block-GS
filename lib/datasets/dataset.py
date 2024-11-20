@@ -1,7 +1,7 @@
 '''
 Author: ssp
 Date: 2024-10-23 21:14:25
-LastEditTime: 2024-10-26 14:19:52
+LastEditTime: 2024-11-18 11:30:31
 '''
 import os
 import random
@@ -11,12 +11,13 @@ from lib.config import cfg
 from lib.datasets.base_readers import storePly, SceneInfo
 from lib.datasets.colmap_readers import readColmapSceneInfo
 from lib.datasets.blender_readers import readNerfSyntheticInfo
-from lib.datasets.waymo_full_readers import readWaymoFullInfo
+from lib.datasets.waymo_full_readers import readWaymoFullInfo, partitonReadWaymoFullInfo
 
 sceneLoadTypeCallbacks = {
     "Colmap": readColmapSceneInfo,
     "Blender" : readNerfSyntheticInfo,
     "Waymo": readWaymoFullInfo,
+    "PartitonWaymo": partitonReadWaymoFullInfo,
 }
 
 class Dataset():

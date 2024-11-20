@@ -1,7 +1,7 @@
 '''
 Author: ssp
 Date: 2024-10-23 21:14:25
-LastEditTime: 2024-11-11 15:02:40
+LastEditTime: 2024-11-20 13:31:29
 '''
 import torch
 import torch.nn as nn
@@ -203,10 +203,17 @@ class StreetGaussianModel(nn.Module):
         return state_dict
         
     def setup_functions(self):
-        obj_tracklets = self.metadata['obj_tracklets']
-        obj_info = self.metadata['obj_meta']
-        tracklet_timestamps = self.metadata['tracklet_timestamps']
-        camera_timestamps = self.metadata['camera_timestamps']
+        # 兼容仅colmap
+        try:
+            obj_tracklets = self.metadata['obj_tracklets']
+            obj_info = self.metadata['obj_meta']
+            tracklet_timestamps = self.metadata['tracklet_timestamps']
+            camera_timestamps = self.metadata['camera_timestamps']
+        except:
+            obj_tracklets = None
+            obj_info = None
+            tracklet_timestamps = None
+            camera_timestamps = None
         
         self.model_name_id = bidict()
         self.obj_list = []
@@ -344,10 +351,11 @@ class StreetGaussianModel(nn.Module):
         
         # set background mask
         # self.background.set_background_mask(camera)
-        
-        self.frame = camera.meta['frame']
-        self.frame_idx = camera.meta['frame_idx']
-        self.frame_is_val = camera.meta['is_val']
+        # 兼容仅colmap
+        if self.include_obj:
+            self.frame = camera.meta['frame']
+            self.frame_idx = camera.meta['frame_idx']
+            self.frame_is_val = camera.meta['is_val']
         self.num_gaussians = 0
 
         # background        
@@ -620,6 +628,13 @@ class StreetGaussianModel(nn.Module):
         if self.active_sh_degree < self.max_sh_degree:
             self.active_sh_degree += 1
 
+    def post_training_setup(self, exclude_list=[]):
+        for model_name in self.model_name_id.keys():
+            if startswith_any(model_name, exclude_list):
+                continue
+            model: GaussianModel = getattr(self, model_name)
+            model.post_training_setup()
+        
     def training_setup(self, exclude_list=[]):
         self.active_sh_degree = 0
 
@@ -659,7 +674,14 @@ class StreetGaussianModel(nn.Module):
             
         if self.pose_correction is not None:
             self.pose_correction.update_learning_rate(iteration)
-    
+        
+    def post_updat_optimizer(self, exclude_list=[]):
+        for model_name in self.model_name_id.keys():
+            if startswith_any(model_name, exclude_list):
+                continue
+            model: GaussianModel = getattr(self, model_name)
+            model.update_optimizer()
+        
     def update_optimizer(self, exclude_list=[]):
         for model_name in self.model_name_id.keys():
             if startswith_any(model_name, exclude_list):
@@ -688,6 +710,10 @@ class StreetGaussianModel(nn.Module):
             end += 1
             visibility_model = visibility_filter[start:end]
             max_radii2D_model = radii[start:end]
+            # print("model R")
+            # print(model.max_radii2D)
+            # print("output R")
+            # print(max_radii2D_model)
             model.max_radii2D[visibility_model] = torch.max(
                 model.max_radii2D[visibility_model], max_radii2D_model[visibility_model])
         

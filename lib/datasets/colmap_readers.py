@@ -1,15 +1,18 @@
 import os
 import sys
+import cv2
 import numpy as np
 from PIL import Image
 from lib.utils.graphics_utils import getWorld2View2, focal2fov, fov2focal, BasicPointCloud
 from lib.utils.colmap_utils import read_extrinsics_text, read_intrinsics_text, qvec2rotmat, \
     read_extrinsics_binary, read_intrinsics_binary, read_points3D_binary, read_points3D_text
 from lib.config import cfg
-from lib.datasets.base_readers import CameraInfo, SceneInfo, getNerfppNorm, fetchPly, storePly
+from lib.datasets.base_readers import CameraInfo, SceneInfo, getNerfppNorm, fetchPly, storePly, get_Sphere_Norm
 
 def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
     cam_infos = []
+    sky_mask_folder = os.path.join(images_folder[:-len(os.path.basename(images_folder))], 'sky_mask')
+    print("Colmap sky_mask_folder : ", sky_mask_folder)
     for idx, key in enumerate(cam_extrinsics):
         sys.stdout.write('\r')
         # the exact output you're looking for:
@@ -39,16 +42,53 @@ def readColmapCameras(cam_extrinsics, cam_intrinsics, images_folder):
             FovY = focal2fov(focal_length_y, height)
             FovX = focal2fov(focal_length_x, width)
             K = np.array([[focal_length_x, 0, cx], [0, focal_length_y, cy], [0, 0, 1]]).astype(np.float32)
+        elif intr.model == "SIMPLE_RADIAL":
+            focal_length_x = intr.params[0]
+            cx = intr.params[1]
+            cy = intr.params[2]
+            FovY = focal2fov(focal_length_x, height)
+            FovX = focal2fov(focal_length_x, width)
+            K = np.array([[focal_length_x, 0, cx], [0, focal_length_x, cy], [0, 0, 1]]).astype(np.float32)
+        elif intr.model == "OPENCV":
+            focal_length_x = intr.params[0]
+            focal_length_y = intr.params[1]
+            cx = intr.params[2]  # 主点横坐标
+            cy = intr.params[3]  # 主点纵坐标
+            FovY = focal2fov(focal_length_y, height)
+            FovX = focal2fov(focal_length_x, width)
+            K = np.array([[focal_length_x, 0, cx], [0, focal_length_y, cy], [0, 0, 1]]).astype(np.float32)
         else:
-            assert False, "Colmap camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
+            print("Camera model is: ", intr.model)
+            assert False, "COLMAP camera model not handled: only undistorted datasets (PINHOLE or SIMPLE_PINHOLE cameras) supported!"
 
-        image_path = os.path.join(images_folder, os.path.basename(extr.name))
-        image_name = os.path.basename(image_path).split(".")[0]
+
+        image_path = os.path.join(images_folder, extr.name)
+        image_name = extr.name
         image = Image.open(image_path)
+        try:
+            # images
+            mask_path = os.path.join(os.path.dirname(images_folder), "mask", extr.name)
+            # print("mask path is : ", mask_path)
+            img_mask = Image.open(mask_path).convert("L")  
+            # print("mask shape is : ", np.array(mask).shape)
+        except:
+            img_mask = None
+        metadata = {}
+
+        # read sky_mask
+        try:
+            sky_mask_path = os.path.join(sky_mask_folder, extr.name)
+            sky_mask = (cv2.imread(sky_mask_path)[..., 0]) > 0.
+            sky_mask = Image.fromarray(sky_mask)
+            metadata['sky_mask'] = sky_mask
+        except:
+            metadata['sky_mask'] = None
+        # 第几个相机，为后面优化天空做准备
+        metadata['cam'] = 0
 
         cam_info = CameraInfo(uid=uid, R=R, T=T, FovY=FovY, FovX=FovX, K=K, 
             image=image, image_path=image_path, image_name=image_name,
-            width=width, height=height)
+            width=width, height=height, metadata=metadata, mask=img_mask)
         cam_infos.append(cam_info)
     sys.stdout.write('\n')
     return cam_infos
@@ -97,9 +137,18 @@ def readColmapSceneInfo(path, images='images', split_test=8, **kwargs):
     except:
         pcd = None
 
+    scene_metadata = dict()
+
+    scene_metadata['scene_center'] = nerf_normalization['center']
+    scene_metadata['scene_radius'] = nerf_normalization['radius']
+    sphere_normalization = get_Sphere_Norm(pcd.points)
+    scene_metadata['sphere_center'] = sphere_normalization['center']
+    scene_metadata['sphere_radius'] = sphere_normalization['radius']
+
     scene_info = SceneInfo(point_cloud=pcd,
                            train_cameras=train_cam_infos,
                            test_cameras=test_cam_infos,
                            nerf_normalization=nerf_normalization,
-                           ply_path=ply_path)
+                           ply_path=ply_path,
+                           metadata=scene_metadata)
     return scene_info

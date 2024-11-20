@@ -33,26 +33,36 @@ def setup(args):
     # ======================== Load Grounding DINO model ========================
     print(colored('Load Grounding DINO model', 'green'))
     def load_model_hf(repo_id, filename, ckpt_config_filename, device='cpu'):
-        cache_config_file = hf_hub_download(repo_id=repo_id, filename=ckpt_config_filename)
+        if repo_id is None:
+            # 直接使用本地文件
+            cache_config_file = ckpt_config_filename
+            cache_file = filename
+        else:
+            # 使用 Hugging Face Hub 下载
+            cache_config_file = hf_hub_download(repo_id=repo_id, filename=ckpt_config_filename)
+            cache_file = hf_hub_download(repo_id=repo_id, filename=filename)
 
-        args = SLConfig.fromfile(cache_config_file) 
+        # 从配置文件中加载模型
+        args = SLConfig.fromfile(cache_config_file)
         model = build_model(args)
         args.device = device
 
-        cache_file = hf_hub_download(repo_id=repo_id, filename=filename)
+        # 加载模型权重
         checkpoint = torch.load(cache_file, map_location='cpu')
         log = model.load_state_dict(clean_state_dict(checkpoint['model']), strict=False)
         print("Model loaded from {} \n => {}".format(cache_file, log))
         _ = model.eval()
-        return model   
+        
+        return model
+
 
     # Use this command for evaluate the Grounding DINO model
     # Or you can download the model by yourself
     ckpt_repo_id = "ShilongLiu/GroundingDINO"
-    ckpt_filenmae = "groundingdino_swinb_cogcoor.pth"
-    ckpt_config_filename = "GroundingDINO_SwinB.cfg.py"
+    ckpt_filenmae = "./groundingdino_swinb_cogcoor.pth"
+    ckpt_config_filename = "./GroundingDINO_SwinB.cfg.py"
     global groundingdino_model 
-    groundingdino_model = load_model_hf(ckpt_repo_id, ckpt_filenmae, ckpt_config_filename)
+    groundingdino_model = load_model_hf(None, ckpt_filenmae, ckpt_config_filename)
 
     # ======================== Load Segment Anything model ========================
     print(colored('Load SAM model', 'green'))
@@ -61,23 +71,22 @@ def setup(args):
     sam.cuda()
     global sam_predictor
     sam_predictor = SamPredictor(sam)
-
-image_filename_to_cam = lambda x: int(x.split('.')[0][-1])
-image_filename_to_frame = lambda x: int(x.split('.')[0][:6])
-
-def add_to_mask_dict(masks_dict, mask_path):
-    basename = os.path.basename(mask_path)
-    cam = image_filename_to_cam(basename)
-    frame = image_filename_to_frame(basename)
-    mask = cv2.imread(mask_path) 
-    if frame not in masks_dict:
-        masks_dict[frame] = [None] * 3 # FRONT_LEFT, FRONT, FRONT_RIGHT 1, 0, 2
-    if cam == 1:
-        masks_dict[frame][0] = mask
-    elif cam == 0:
-        masks_dict[frame][1] = mask
-    elif cam == 2:
-        masks_dict[frame][2] = mask
+# pre
+# image_filename_to_cam = lambda x: int(x.split('.')[0][-1])
+# image_filename_to_frame = lambda x: int(x.split('.')[0][:6])
+# def add_to_mask_dict(masks_dict, mask_path):
+#     basename = os.path.basename(mask_path)
+#     cam = image_filename_to_cam(basename)
+#     frame = image_filename_to_frame(basename)
+#     mask = cv2.imread(mask_path) 
+#     if frame not in masks_dict:
+#         masks_dict[frame] = [None] * 3 # FRONT_LEFT, FRONT, FRONT_RIGHT 1, 0, 2
+#     if cam == 1:
+#         masks_dict[frame][0] = mask
+#     elif cam == 0:
+#         masks_dict[frame][1] = mask
+#     elif cam == 2:
+        # masks_dict[frame][2] = mask
     
 
 
@@ -88,7 +97,7 @@ def segment_with_text_prompt(datadir, BOX_TRESHOLD, TEXT_TRESHOLD, ignore_exists
     image_dir = os.path.join(datadir, 'images')
     image_files = glob(image_dir + "/*.jpg") 
     image_files += glob(image_dir + "/*.png")
-    image_files = sorted(image_files)
+    # image_files = sorted(image_files, key=lambda x:(int(os.path.basename(x).split('_')[0]), int(os.path.basename(x).split('_')[1].split('.')[0])))
     
     masks_dict = dict()
     for image_path in tqdm(image_files):
@@ -96,12 +105,13 @@ def segment_with_text_prompt(datadir, BOX_TRESHOLD, TEXT_TRESHOLD, ignore_exists
         output_mask = os.path.join(save_dir, image_base_name)
                         
         if os.path.exists(output_mask) and ignore_exists:
-            add_to_mask_dict(masks_dict, output_mask)
+            # add_to_mask_dict(masks_dict, output_mask)
             print(f'{output_mask} exists, skip')
             continue
         
-        cam = image_filename_to_cam(image_base_name)
-        box_threshold = BOX_TRESHOLD[cam]
+        # cam = image_filename_to_cam(image_base_name)
+        # box_threshold = BOX_TRESHOLD[cam]
+        box_threshold = BOX_TRESHOLD[0]
         
         image_source, image = load_image(image_path)
         boxes, logits, phrases = predict(
@@ -150,7 +160,7 @@ def segment_with_text_prompt(datadir, BOX_TRESHOLD, TEXT_TRESHOLD, ignore_exists
             mask = mask_final.cpu().numpy()
             
         cv2.imwrite(output_mask, mask * 255)
-        add_to_mask_dict(masks_dict, output_mask)
+        # add_to_mask_dict(masks_dict, output_mask)
 
     print('saving sky mask video')
     masks_dict = dict(sorted(masks_dict.items(), key=lambda x: x[0]))

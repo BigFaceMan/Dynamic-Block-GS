@@ -187,7 +187,7 @@ def loadCam(cam_info: CameraInfo, resolution_scale):
 
         scale = float(global_down) * float(resolution_scale)
         resolution = (int(orig_w / scale), int(orig_h / scale))
-
+    
     K = copy.deepcopy(cam_info.K)
     K[:2] /= scale
 

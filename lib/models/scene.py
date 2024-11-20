@@ -1,7 +1,7 @@
 '''
 Author: ssp
 Date: 2024-10-23 21:14:25
-LastEditTime: 2024-10-26 16:08:03
+LastEditTime: 2024-11-18 14:31:12
 '''
 import os
 import torch
@@ -17,11 +17,11 @@ class Scene:
     gaussians : Union[GaussianModel, StreetGaussianModel]
     dataset: Dataset
 
-    def __init__(self, gaussians: Union[GaussianModel, StreetGaussianModel], dataset: Dataset):
+    def __init__(self, gaussians: Union[GaussianModel, StreetGaussianModel], dataset: Dataset, post_train_stage=False):
         self.dataset = dataset
         self.gaussians = gaussians
         
-        if cfg.mode == 'train':
+        if cfg.mode == 'train' and not post_train_stage:
             point_cloud = self.dataset.scene_info.point_cloud
             scene_raidus = self.dataset.scene_info.metadata['scene_radius']
             print("Creating gaussian model from point cloud")
@@ -65,7 +65,11 @@ class Scene:
                     state_dict_bkg = torch.load(checkpoint_path_bkg)
                     state_dict_obj = torch.load(checkpoint_path_obj)
                     self.gaussians.load_state_dict_ind(state_dict_bkg, state_dict_obj)
-            
+                
+    def save_block(self, iteration):
+        point_cloud_path = os.path.join(cfg.point_cloud_dir, f"iteration_{iteration}", f"{cfg.block.partition_id}_point_cloud.ply")
+        self.gaussians.save_ply(point_cloud_path)
+        
     def save(self, iteration):
         point_cloud_path = os.path.join(cfg.point_cloud_dir, f"iteration_{iteration}", "point_cloud.ply")
         self.gaussians.save_ply(point_cloud_path)

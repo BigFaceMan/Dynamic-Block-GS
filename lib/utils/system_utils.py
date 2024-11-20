@@ -1,3 +1,8 @@
+'''
+Author: ssp
+Date: 2024-10-29 23:18:42
+LastEditTime: 2024-11-14 10:15:00
+'''
 #
 # Copyright (C) 2023, Inria
 # GRAPHDECO research group, https://team.inria.fr/graphdeco
@@ -25,4 +30,5 @@ def mkdir_p(folder_path):
 
 def searchForMaxIteration(folder):
     saved_iters = [int(fname.split('.')[0].split("_")[-1]) for fname in os.listdir(folder)]
+    print("all save_iters : \n", saved_iters)
     return max(saved_iters)

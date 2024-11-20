@@ -1,7 +1,7 @@
 '''
 Author: ssp
 Date: 2024-10-30 11:03:42
-LastEditTime: 2024-10-31 13:14:46
+LastEditTime: 2024-11-18 10:27:48
 '''
 import os
 from lib.datasets.dataset import sceneLoadTypeCallbacks
@@ -73,5 +73,4 @@ def get_output():
     print(sceneLoadTypeCallbacks.keys())
 
 if __name__ == '__main__':
-    # read_camList(r"E:\Pycharm\3D_Reconstruct\VastGaussian\output\train_1\train_cameras.txt")
     print(sceneLoadTypeCallbacks.keys())

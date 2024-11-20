@@ -156,24 +156,33 @@ class GaussianModel(nn.Module):
         self.active_sh_degree = self.max_sh_degree
             
     def load_state_dict(self, state_dict):  
-        self._xyz = state_dict['xyz']  
-        self._features_dc = state_dict['feature_dc']
-        self._features_rest = state_dict['feature_rest']
-        self._scaling = state_dict['scaling']
-        self._rotation = state_dict['rotation']
-        self._opacity = state_dict['opacity']
-        self._semantic = state_dict['semantic']
-        
+        # self._xyz = state_dict['xyz']  
+        # self._features_dc = state_dict['feature_dc']
+        # self._features_rest = state_dict['feature_rest']
+        # self._scaling = state_dict['scaling']
+        # self._rotation = state_dict['rotation']
+        # self._opacity = state_dict['opacity']
+        # self._semantic = state_dict['semantic']
+        device = 'cuda' 
+        self._xyz = nn.Parameter(state_dict['xyz'].to(device), requires_grad=True)
+        self._features_dc = nn.Parameter(state_dict['feature_dc'].to(device), requires_grad=True)
+        self._features_rest = nn.Parameter(state_dict['feature_rest'].to(device), requires_grad=True)
+        self._scaling = nn.Parameter(state_dict['scaling'].to(device), requires_grad=True)
+        self._rotation = nn.Parameter(state_dict['rotation'].to(device), requires_grad=True)
+        self._opacity = nn.Parameter(state_dict['opacity'].to(device), requires_grad=True)
+        self._semantic = nn.Parameter(state_dict['semantic'].to(device), requires_grad=True)
+
         if cfg.mode == 'train':
             self.training_setup()
+            print("max_radii2D : ")
             if 'spatial_lr_scale' in state_dict:
                 self.spatial_lr_scale = state_dict['spatial_lr_scale'] 
             if 'denom' in state_dict:
-                self.denom = state_dict['denom'] 
+                self.denom = state_dict['denom'].to(device)
             if 'max_radii2D' in state_dict:
-                self.max_radii2D = state_dict['max_radii2D'] 
+                self.max_radii2D = state_dict['max_radii2D'].to(device)
             if 'xyz_gradient_accum' in state_dict:
-                self.xyz_gradient_accum = state_dict['xyz_gradient_accum']
+                self.xyz_gradient_accum = state_dict['xyz_gradient_accum'].to(device)
             if 'active_sh_degree' in state_dict:
                 self.active_sh_degree = state_dict['active_sh_degree']
             if 'optimizer' in state_dict:
@@ -313,6 +322,23 @@ class GaussianModel(nn.Module):
         self.densify_and_prune_list = ['xyz, f_dc, f_rest, opacity, scaling, rotation, semantic']
         self.scalar_dict = dict()
         self.tensor_dict = dict()  
+        
+
+    def post_training_setup(self):
+        print("model : ", self.model_name)
+        # opacity_params = [param for group in self.optimizer.param_groups 
+        #                       for param in group['params'] if 'opacity' in group['name']]
+            
+        #     # Rebuild the optimizer with only 'opacity' params
+        # self.optimizer = torch.optim.Adam([{'params': opacity_params, 'lr': cfg.optim.opacity_lr}],
+        #                                     lr=0.0, eps=1e-15)
+        for group in self.optimizer.param_groups:
+            for param in group['params']:
+                if 'opacity' in group['name']:
+                    param.requires_grad = True  # 冻结该参数
+                    print("only optimizer opacity")
+                else:
+                    param.requires_grad = False   # 确保其他参数仍然可训练
         
     def update_optimizer(self):
         self.optimizer.step()
