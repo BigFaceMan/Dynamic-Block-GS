@@ -1,7 +1,7 @@
 '''
 Author: ssp
 Date: 2024-10-23 21:14:25
-LastEditTime: 2024-11-18 14:31:12
+LastEditTime: 2024-11-22 10:56:58
 '''
 import os
 import torch
@@ -67,8 +67,8 @@ class Scene:
                     self.gaussians.load_state_dict_ind(state_dict_bkg, state_dict_obj)
                 
     def save_block(self, iteration):
-        point_cloud_path = os.path.join(cfg.point_cloud_dir, f"iteration_{iteration}", f"{cfg.block.partition_id}_point_cloud.ply")
-        self.gaussians.save_ply(point_cloud_path)
+        point_cloud_dir = os.path.join(cfg.point_cloud_dir, f"iteration_{iteration}")
+        self.gaussians.save_ply_block(point_cloud_dir)
         
     def save(self, iteration):
         point_cloud_path = os.path.join(cfg.point_cloud_dir, f"iteration_{iteration}", "point_cloud.ply")

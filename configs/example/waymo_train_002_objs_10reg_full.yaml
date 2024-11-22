@@ -1,7 +1,6 @@
 task: waymo_full_exp
 source_path: /lfs3/users/spsong/dataset/waymo/training/002
-exp_name: waymo_train_002_objs_s010p1000
-loaded_iter: 55000
+exp_name: waymo_train_002_objs_10reg_full
 
 data:
   split_test: -1
@@ -54,9 +53,6 @@ optim:
   feature_lr: 0.0025
   max_screen_size: 20
   min_opacity: 0.005
-  prune_min_opacity_iter: 50000
-  prune_min_opacity_interval: 200
-  post_min_opacity: 0.0005
   opacity_lr: 0.05
   opacity_reset_interval: 3000
   percent_big_ws: 0.1
@@ -73,7 +69,7 @@ optim:
   lambda_sky: 0.05
   lambda_sky_scale: [1, 1, 0]
   lambda_mask: 0.1
-  lambda_reg: 1.
+  lambda_reg: 10
   lambda_depth_lidar: 0.1
 
   track_position_lr_delay_mult: 0.01

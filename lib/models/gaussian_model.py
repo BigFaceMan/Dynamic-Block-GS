@@ -96,6 +96,15 @@ class GaussianModel(nn.Module):
         
         return elements
 
+    def set_params(self, param_dict):
+        for key, param in param_dict.items():
+            if key == 'app_mlp':
+                self.mlp.load_state_dict(param)
+            elif key == 'app_pos_emb':
+                self.pos_emb.load_state_dict(param)
+            else:
+                setattr(self, '_'+key, nn.Parameter(param.requires_grad_(True).cuda()))
+
     def save_ply(self, path):
         mkdir_p(os.path.dirname(path))
         elements = self.make_ply()

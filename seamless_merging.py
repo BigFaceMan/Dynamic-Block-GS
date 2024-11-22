@@ -77,7 +77,7 @@ def extend_inf_x_z_bbox(partition_id, m_region, n_region):
 
 def load_ply(path):
     plydata = PlyData.read(path)
-    max_sh_degree = 3
+    max_sh_degree = 1
     xyz = np.stack((np.asarray(plydata.elements[0]["x"]),
                     np.asarray(plydata.elements[0]["y"]),
                     np.asarray(plydata.elements[0]["z"])), axis=1)
@@ -109,7 +109,7 @@ def load_ply(path):
     for idx, attr_name in enumerate(rot_names):
         rots[:, idx] = np.asarray(plydata.elements[0][attr_name])
 
-    semantic_names = [p.name for p in plydata.properties if p.name.startswith("semantic_")]
+    semantic_names = [p.name for p in plydata.elements[0].properties if p.name.startswith("semantic_")]
     semantic_names = sorted(semantic_names, key = lambda x: int(x.split('_')[-1]))
     semantic = np.zeros((xyz.shape[0], len(semantic_names)))
     for idx, attr_name in enumerate(semantic_names):
@@ -151,7 +151,7 @@ def seamless_merge(model_path, partition_point_cloud_dir):
     semantic_list = []
 
     for partition in partition_scene:
-        point_cloud_path = os.path.join(partition_point_cloud_dir, f"{partition.partition_id}_point_cloud.ply")
+        point_cloud_path = os.path.join(partition_point_cloud_dir, f"{partition.partition_id}_point_cloud_background.ply")
         if not os.path.exists(point_cloud_path): continue
         xyz, features_dc, features_extra, opacities, scales, rots, semantics = load_ply(point_cloud_path)
         ori_camera_bbox = partition.ori_camera_bbox
@@ -234,7 +234,7 @@ def seamless_merge(model_path, partition_point_cloud_dir):
                      'opacity': torch.from_numpy(opacities_list).float().cuda(),
                      'features_dc': torch.from_numpy(features_dc_list).float().cuda().permute(0, 2, 1),
                      'features_rest': torch.from_numpy(features_extra_list).float().cuda().permute(0, 2, 1), 
-                     'semantic': torch.from_numpy(semantic_list).float.cuda()}
+                     'semantic': torch.from_numpy(semantic_list).float().cuda()}
 
     global_model.set_params(global_params)
     global_model.save_ply(save_merge_dir)

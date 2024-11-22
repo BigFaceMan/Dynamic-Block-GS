@@ -1,7 +1,7 @@
 '''
 Author: ssp
 Date: 2024-10-23 21:14:25
-LastEditTime: 2024-11-20 13:31:29
+LastEditTime: 2024-11-22 11:00:03
 '''
 import torch
 import torch.nn as nn
@@ -95,7 +95,22 @@ class StreetGaussianModel(nn.Module):
                 model.create_from_pcd(pcd, spatial_lr_scale)
             else:
                 model.create_from_pcd(spatial_lr_scale)
-
+    def save_ply_block(self, save_dir):
+        for i in range(self.models_num):
+            model_name = self.model_name_id.inverse[i]
+            path = os.path.join(save_dir, f"{cfg.block.partition_id}_point_cloud_{model_name}.ply")
+            mkdir_p(os.path.dirname(path))
+            model: GaussianModel = getattr(self, model_name)
+            # plydata = model.make_ply()
+            try:
+                plydata = model.make_ply_nfourier()
+            except:
+                print("mode : {} no fourier".format(model_name))
+                plydata = model.make_ply()
+                
+            el = PlyElement.describe(plydata, 'vertex')
+            PlyData([el]).write(path)
+        
     def save_ply(self, path):
         mkdir_p(os.path.dirname(path))
         

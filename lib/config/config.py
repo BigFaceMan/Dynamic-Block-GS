@@ -46,6 +46,8 @@ cfg.train.importance_sampling = False
 
 cfg.train.waymo_pose = False
 cfg.train.waymo_point = False
+cfg.train.waymo_meta = False
+cfg.train.waymo_smeta = False
 
 cfg.optim = CN()
 # learning rate

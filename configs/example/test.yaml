@@ -1,15 +1,14 @@
 task: waymo_full_exp
-source_path: /lfs3/users/spsong/dataset/waymo/training/002
-exp_name: waymo_train_002_objs_s010p1000
-loaded_iter: 55000
+source_path: /lfs3/users/spsong/dataset/waymo/colmap/waymo_002
+exp_name: test
 
 data:
   split_test: -1
   split_train: 1
-  type: Waymo
+  type: Colmap_test
   white_background: false
   selected_frames: [0, 198]
-  cameras: [0]
+  cameras: [0, 1, 2]
   extent: 10
   use_colmap: true
   filter_colmap: true
@@ -30,12 +29,16 @@ model:
     fourier_scale: 1.
     flip_prob: 0.5
   nsg:
-    include_bkgd: false
-    include_obj: true
+    include_bkgd: true
+    include_obj: false
     include_sky: false
-    opt_track: true
+    opt_track: false
 
 train:
+  waymo_pose: false
+  waymo_point: false
+  waymo_meta: false
+  waymo_smeta: true
   iterations: 50000
   test_iterations: [7000, 30000, 50000]
   save_iterations: [50000]
@@ -54,9 +57,6 @@ optim:
   feature_lr: 0.0025
   max_screen_size: 20
   min_opacity: 0.005
-  prune_min_opacity_iter: 50000
-  prune_min_opacity_interval: 200
-  post_min_opacity: 0.0005
   opacity_lr: 0.05
   opacity_reset_interval: 3000
   percent_big_ws: 0.1
@@ -73,7 +73,7 @@ optim:
   lambda_sky: 0.05
   lambda_sky_scale: [1, 1, 0]
   lambda_mask: 0.1
-  lambda_reg: 1.
+  lambda_reg: 0.1
   lambda_depth_lidar: 0.1
 
   track_position_lr_delay_mult: 0.01

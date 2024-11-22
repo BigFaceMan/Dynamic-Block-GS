@@ -20,7 +20,7 @@ try:
     TENSORBOARD_FOUND = True
 except ImportError:
     TENSORBOARD_FOUND = False
-
+    
 def training():
     training_args = cfg.train
     optim_args = cfg.optim
@@ -33,18 +33,18 @@ def training():
     scene = Scene(gaussians=gaussians, dataset=dataset)
 
     gaussians.training_setup()
-    # try:
-    #     if cfg.loaded_iter == -1:
-    #         loaded_iter = searchForMaxIteration(cfg.trained_model_dir)
-    #     else:
-    #         loaded_iter = cfg.loaded_iter
-    #     ckpt_path = os.path.join(cfg.trained_model_dir, f'iteration_{loaded_iter}.pth')
-    #     state_dict = torch.load(ckpt_path)
-    #     start_iter = state_dict['iter']
-    #     print(f'Loading model from {ckpt_path}')
-    #     gaussians.load_state_dict(state_dict)
-    # except:
-    #     pass
+    try:
+        if cfg.loaded_iter == -1:
+            loaded_iter = searchForMaxIteration(cfg.trained_model_dir)
+        else:
+            loaded_iter = cfg.loaded_iter
+        ckpt_path = os.path.join(cfg.trained_model_dir, f'iteration_{loaded_iter}.pth')
+        state_dict = torch.load(ckpt_path)
+        start_iter = state_dict['iter']
+        print(f'Loading model from {ckpt_path}')
+        gaussians.load_state_dict(state_dict)
+    except:
+        pass
 
     print(f'Starting from {start_iter}')
     save_cfg(cfg, cfg.model_path, epoch=start_iter)
@@ -57,25 +57,14 @@ def training():
     ema_loss_for_log = 0.0
     ema_psnr_for_log = 0.0
     psnr_dict = {}
-    progress_bar = tqdm(range(start_iter, training_args.iterations))
+
+    refine_train_len = 5000
+    progress_bar = tqdm(range(start_iter, start_iter + refine_train_len))
     start_iter += 1
 
     viewpoint_stack = None
     output_loss_info = True
-    for iteration in range(start_iter, training_args.iterations + 1):
-    
-        iter_start.record()
-        gaussians.update_learning_rate(iteration)
-
-        # Every 1000 its we increase the levels of SH up to a maximum degree
-        if iteration % 1000 == 0:
-            gaussians.oneupSHdegree()
-
-        # Every 1000 iterations upsample
-        # if iteration % 1000 == 0:
-        #     if resolution_scales:  
-        #         scale = resolution_scales.pop()
-
+    for iteration in range(start_iter, start_iter + refine_train_len + 1):
 
         # Pick a random Camera
         if not viewpoint_stack:
@@ -139,59 +128,6 @@ def training():
         if output_loss_info:
             print("use rgb_loss")
 
-        # sky loss
-        if optim_args.lambda_sky > 0 and gaussians.include_sky and sky_mask is not None:
-            acc = torch.clamp(acc, min=1e-6, max=1.-1e-6)
-            sky_loss = torch.where(sky_mask, -torch.log(1 - acc), -torch.log(acc)).mean()
-            if len(optim_args.lambda_sky_scale) > 0:
-                sky_loss *= optim_args.lambda_sky_scale[viewpoint_cam.meta['cam']]
-            scalar_dict['sky_loss'] = sky_loss.item()
-            loss += optim_args.lambda_sky * sky_loss
-
-            if output_loss_info:
-                print("use sky_loss")
-
-        # semantic loss
-        if optim_args.lambda_semantic > 0 and data_args.get('use_semantic', False) and 'semantic' in viewpoint_cam.meta:
-            gt_semantic = viewpoint_cam.meta['semantic'].cuda().long() # [1, H, W]
-            if torch.all(gt_semantic == -1):
-                semantic_loss = torch.zeros_like(Ll1)
-            else:
-                semantic = render_pkg['semantic'].unsqueeze(0) # [1, S, H, W]
-                semantic_loss = torch.nn.functional.cross_entropy(
-                    input=semantic, 
-                    target=gt_semantic,
-                    ignore_index=-1, 
-                    reduction='mean'
-                )
-            scalar_dict['semantic_loss'] = semantic_loss.item()
-            loss += optim_args.lambda_semantic * semantic_loss
-
-            if output_loss_info:
-                print("use semantic_loss")
-        
-        # bkground reg
-        # 会把很多点给删除掉
-        # 只用背景的去做loss
-        # if optim_args.lambda_reg > 0 and gaussians.include_obj and iteration >= optim_args.densify_until_iter:
-        #     render_pkg_obj = gaussians_renderer.render_object(viewpoint_cam, gaussians)
-        #     image_obj, acc_obj = render_pkg_obj["rgb"], render_pkg_obj['acc']
-        #     acc_obj = torch.clamp(acc_obj, min=1e-6, max=1.-1e-6)
-
-        #     # 将 obj_bound 为 0 的位置设置为 -torch.log(1. - acc_obj)
-        #     # 只回传给背景位置的点
-        #     obj_acc_loss = torch.where(obj_bound, torch.tensor(0.0, device=obj_bound.device), -torch.log(1. - acc_obj))
-        #     # 只计算 obj_bound 为 0 的位置的均值
-        #     obj_acc_loss = obj_acc_loss[~obj_bound].mean()
-        #     # obj_acc_loss = torch.where(obj_bound, 
-        #     #     -(acc_obj * torch.log(acc_obj) +  (1. - acc_obj) * torch.log(1. - acc_obj)), 
-        #     #     -torch.log(1. - acc_obj)).mean()
-        #     scalar_dict['obj_acc_loss'] = obj_acc_loss.item()
-        #     loss += optim_args.lambda_reg * obj_acc_loss
-
-        #     if output_loss_info:
-        #         print("use obj_loss")
-
         if optim_args.lambda_reg > 0 and gaussians.include_obj and iteration >= optim_args.densify_until_iter:
             render_pkg_obj = gaussians_renderer.render_object(viewpoint_cam, gaussians)
             image_obj, acc_obj = render_pkg_obj["rgb"], render_pkg_obj['acc']
@@ -212,90 +148,6 @@ def training():
             # obj_acc_loss = -((acc_obj * torch.log(acc_obj) +  (1. - acc_obj) * torch.log(1. - acc_obj))).mean()
             # scalar_dict['obj_acc_loss'] = obj_acc_loss.item()
             # loss += optim_args.lambda_reg * obj_acc_loss
-        
-        # lidar depth loss
-        if optim_args.lambda_depth_lidar > 0 and 'lidar_depth' in viewpoint_cam.meta:            
-            lidar_depth = viewpoint_cam.meta['lidar_depth'].cuda() # [1, H, W]
-            depth_mask = torch.logical_and((lidar_depth > 0.), mask)
-            # depth_mask[obj_bound] = False
-            if torch.nonzero(depth_mask).any():
-                expected_depth = depth / (render_pkg['acc'] + 1e-10)  
-                depth_error = torch.abs((expected_depth[depth_mask] - lidar_depth[depth_mask]))
-                depth_error, _ = torch.topk(depth_error, int(0.95 * depth_error.size(0)), largest=False)
-                lidar_depth_loss = depth_error.mean()
-                scalar_dict['lidar_depth_loss'] = lidar_depth_loss
-            else:
-                lidar_depth_loss = torch.zeros_like(Ll1)  
-            loss += optim_args.lambda_depth_lidar * lidar_depth_loss
-
-            if output_loss_info:
-                print("use lidar_depth_loss")
-                    
-        # color correction loss
-        if optim_args.lambda_color_correction > 0 and gaussians.use_color_correction:
-            color_correction_reg_loss = gaussians.color_correction.regularization_loss(viewpoint_cam)
-            scalar_dict['color_correction_reg_loss'] = color_correction_reg_loss.item()
-            loss += optim_args.lambda_color_correction * color_correction_reg_loss
-
-            if output_loss_info:
-                print("use color_correction_loss")
-        
-        # pose correction loss
-        if optim_args.lambda_pose_correction > 0 and gaussians.use_pose_correction:
-            pose_correction_reg_loss = gaussians.pose_correction.regularization_loss()
-            scalar_dict['pose_correction_reg_loss'] = pose_correction_reg_loss.item()
-            loss += optim_args.lambda_pose_correction * pose_correction_reg_loss
-
-            if output_loss_info:
-                print("use pose_correction_loss")
-                    
-        # scale flatten loss
-        if optim_args.lambda_scale_flatten > 0:
-            scale_flatten_loss = gaussians.background.scale_flatten_loss()
-            scalar_dict['scale_flatten_loss'] = scale_flatten_loss.item()
-            loss += optim_args.lambda_scale_flatten * scale_flatten_loss
-
-            if output_loss_info:
-                print("use scale_flatten_loss")
-        
-        # opacity sparse loss
-        if optim_args.lambda_opacity_sparse > 0:
-            opacity = gaussians.get_opacity
-            opacity = opacity.clamp(1e-6, 1-1e-6)
-            log_opacity = opacity * torch.log(opacity)
-            log_one_minus_opacity = (1-opacity) * torch.log(1 - opacity)
-            sparse_loss = -1 * (log_opacity + log_one_minus_opacity)[visibility_filter].mean()
-            scalar_dict['opacity_sparse_loss'] = sparse_loss.item()
-            loss += optim_args.lambda_opacity_sparse * sparse_loss
-
-            if output_loss_info:
-                print("use opacity_sparse_loss")
-                
-        # normal loss
-        if optim_args.lambda_normal_mono > 0 and 'mono_normal' in viewpoint_cam.meta and 'normals' in render_pkg:
-            if sky_mask is None:
-                normal_mask = mask
-            else:
-                normal_mask = torch.logical_and(mask, ~sky_mask)
-                normal_mask = normal_mask.squeeze(0)
-                normal_mask[:50] = False
-                
-            normal_gt = viewpoint_cam.meta['mono_normal'].permute(1, 2, 0).cuda() # [H, W, 3]
-            R_c2w = viewpoint_cam.world_view_transform[:3, :3]
-            normal_gt = torch.matmul(normal_gt, R_c2w.T) # to world space
-            normal_pred = render_pkg['normals'].permute(1, 2, 0) # [H, W, 3]    
-            
-            normal_l1_loss = torch.abs(normal_pred[normal_mask] - normal_gt[normal_mask]).mean()
-            normal_cos_loss = (1. - torch.sum(normal_pred[normal_mask] * normal_gt[normal_mask], dim=-1)).mean()
-            scalar_dict['normal_l1_loss'] = normal_l1_loss.item()
-            scalar_dict['normal_cos_loss'] = normal_cos_loss.item()
-            normal_loss = normal_l1_loss + normal_cos_loss
-            loss += optim_args.lambda_normal_mono * normal_loss
-
-            if output_loss_info:
-                print("use normal_loss")
-            
-        scalar_dict['loss'] = loss.item()
 
         loss.backward()
         
@@ -303,23 +155,6 @@ def training():
                 
         is_save_images = True
         output_loss_info = False
-        if is_save_images and (iteration % 1000 == 0):
-            # row0: gt_image, image, depth
-            # row1: acc, image_obj, acc_obj
-            depth_colored, _ = visualize_depth_numpy(depth.detach().cpu().numpy().squeeze(0))
-            depth_colored = depth_colored[..., [2, 1, 0]] / 255.
-            depth_colored = torch.from_numpy(depth_colored).permute(2, 0, 1).float().cuda()
-            row0 = torch.cat([gt_image, image, depth_colored], dim=2)
-            acc = acc.repeat(3, 1, 1)
-            with torch.no_grad():
-                render_pkg_obj = gaussians_renderer.render_object(viewpoint_cam, gaussians)
-                image_obj, acc_obj = render_pkg_obj["rgb"], render_pkg_obj['acc']
-            acc_obj = acc_obj.repeat(3, 1, 1)
-            row1 = torch.cat([acc, image_obj, acc_obj], dim=2)
-            image_to_show = torch.cat([row0, row1], dim=1)
-            image_to_show = torch.clamp(image_to_show, 0.0, 1.0)
-            os.makedirs(f"{cfg.model_path}/log_images", exist_ok = True)
-            save_img_torch(image_to_show, f"{cfg.model_path}/log_images/{iteration}.jpg")
         
         with torch.no_grad():
             # Log
@@ -345,42 +180,13 @@ def training():
                 print("\n[ITER {}] Saving Gaussians".format(iteration))
                 scene.save(iteration)
 
-            # Densification
-            if iteration < optim_args.densify_until_iter:
-                gaussians.set_visibility(include_list=list(set(gaussians.model_name_id.keys()) - set(['sky'])))
-                gaussians.parse_camera(viewpoint_cam)   
-                gaussians.set_max_radii2D(radii, visibility_filter)
-                gaussians.add_densification_stats(viewspace_point_tensor, visibility_filter)
-                
-                prune_big_points = iteration > optim_args.opacity_reset_interval
-
-                if iteration > optim_args.densify_from_iter:
-                    if iteration % optim_args.densification_interval == 0:
-                        scalars, tensors = gaussians.densify_and_prune(
-                            max_grad=optim_args.densify_grad_threshold,
-                            min_opacity=optim_args.min_opacity,
-                            prune_big_points=prune_big_points,
-                        )
-
-                        scalar_dict.update(scalars)
-                        tensor_dict.update(tensors)
-                        
-            # Reset opacity
-            if iteration < optim_args.densify_until_iter:
-                if iteration % optim_args.opacity_reset_interval == 0:
-                    gaussians.reset_opacity()
-                if data_args.white_background and iteration == optim_args.densify_from_iter:
-                    gaussians.reset_opacity()
-
-            training_report(tb_writer, iteration, scalar_dict, tensor_dict, training_args.test_iterations, scene, gaussians_renderer)
+            # training_report(tb_writer, iteration, scalar_dict, tensor_dict, training_args.test_iterations, scene, gaussians_renderer)
 
             # Optimizer step
-            if iteration < training_args.iterations:
-                gaussians.update_optimizer()
+            gaussians.post_updat_optimizer()
 
-            if (iteration in training_args.checkpoint_iterations):
+            if (iteration == training_args.iterations + refine_train_len):
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
-                # state_dict = gaussians.save_state_dict(is_final=(iteration == training_args.iterations))
                 state_dict = gaussians.save_state_dict(is_final=False)
                 state_dict['iter'] = iteration
                 ckpt_path = os.path.join(cfg.trained_model_dir, f'iteration_{iteration}.pth')

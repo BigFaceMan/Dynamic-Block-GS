@@ -1,9 +1,9 @@
 ###
  # @Author: ssp
  # @Date: 2024-11-20 16:59:32
- # @LastEditTime: 2024-11-20 20:06:50
+ # @LastEditTime: 2024-11-22 10:23:13
 ### 
-CONFIG_PATH="/lfs1/users/spsong/Code/Dynamic-Block-GS/configs/example/waymo_train_002_0_198_colmap_bkg_pose.yaml"
+CONFIG_PATH="/lfs1/users/spsong/Code/Dynamic-Block-GS/configs/example/test.yaml"
 CUDA_ID=3
 
 # 运行训练、渲染和度量脚本

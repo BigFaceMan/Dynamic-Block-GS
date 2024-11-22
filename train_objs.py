@@ -365,14 +365,15 @@ def training():
                         scalar_dict.update(scalars)
                         tensor_dict.update(tensors)
                         
-            elif iteration < optim_args.prune_min_opacity_iter:
-                    if iteration % optim_args.prune_min_opacity_interval == 0:
-                        scalars, tensors = gaussians.prune_min_opacity(
-                            min_opacity=optim_args.post_min_opacity
-                        )
+            # 边弄边删除
+            # elif iteration < optim_args.prune_min_opacity_iter:
+            #         if iteration % optim_args.prune_min_opacity_interval == 0:
+            #             scalars, tensors = gaussians.prune_min_opacity(
+            #                 min_opacity=optim_args.post_min_opacity
+            #             )
 
-                        scalar_dict.update(scalars)
-                        tensor_dict.update(tensors)
+            #             scalar_dict.update(scalars)
+            #             tensor_dict.update(tensors)
             # Reset opacity
             if iteration < optim_args.densify_until_iter:
                 if iteration % optim_args.opacity_reset_interval == 0:

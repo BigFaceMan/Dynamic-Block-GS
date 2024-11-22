@@ -37,7 +37,8 @@ class BaseVisualizer():
             rgb = (rgb.detach().cpu().numpy().transpose(1, 2, 0) * 255).astype(np.uint8)
             self.rgbs.append(rgb)
             
-        self.visualize_diff(result, camera)
+        # Todo 不去存储diff
+        # self.visualize_diff(result, camera)
         self.visualize_depth(result, camera)
     
     def visualize_diff(self, result, camera: Camera):

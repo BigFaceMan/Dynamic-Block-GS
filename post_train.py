@@ -175,7 +175,7 @@ def training():
 
             if (iteration == training_args.iterations + post_train_len):
                 print("\n[ITER {}] Saving Checkpoint".format(iteration))
-                state_dict = gaussians.save_state_dict(is_final=True)
+                state_dict = gaussians.save_state_dict(is_final=False)
                 state_dict['iter'] = iteration
                 ckpt_path = os.path.join(cfg.trained_model_dir, f'iteration_{iteration}.pth')
                 torch.save(state_dict, ckpt_path)

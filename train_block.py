@@ -1,6 +1,6 @@
 import os
 import torch
-import glob
+from glob import glob
 import multiprocessing as mp
 from random import randint
 from lib.utils.loss_utils import l1_loss, l2_loss, psnr, ssim
@@ -17,6 +17,7 @@ from lib.config import cfg
 from tqdm import tqdm
 from argparse import ArgumentParser, Namespace
 from lib.utils.system_utils import searchForMaxIteration
+from seamless_merging import seamless_merge
 import time
 try:
     from torch.utils.tensorboard import SummaryWriter
@@ -41,10 +42,10 @@ def training():
             loaded_iter = searchForMaxIteration(cfg.trained_model_dir)
         else:
             loaded_iter = cfg.loaded_iter
-        ckpt_path = os.path.join(cfg.trained_model_dir, f'iteration_{loaded_iter}.pth')
+        ckpt_path = os.path.join(cfg.trained_model_dir, f'{cfg.block.partition_id}_iteration_{loaded_iter}.pth')
         state_dict = torch.load(ckpt_path)
         start_iter = state_dict['iter']
-        print(f'Loading model from {ckpt_path}')
+        print(f'Scene_{cfg.block.partition_id}_Loading model from {ckpt_path}')
         gaussians.load_state_dict(state_dict)
     except:
         pass
@@ -64,6 +65,7 @@ def training():
     start_iter += 1
 
     viewpoint_stack = None
+
     for iteration in range(start_iter, training_args.iterations + 1):
     
         iter_start.record()
@@ -259,8 +261,8 @@ def training():
             row1 = torch.cat([acc, image_obj, acc_obj], dim=2)
             image_to_show = torch.cat([row0, row1], dim=1)
             image_to_show = torch.clamp(image_to_show, 0.0, 1.0)
-            os.makedirs(f"{cfg.model_path}/log_images", exist_ok = True)
-            save_img_torch(image_to_show, f"{cfg.model_path}/log_images/{iteration}.jpg")
+            os.makedirs(f"{cfg.model_path}/{cfg.block.partition_id}_log_images", exist_ok = True)
+            save_img_torch(image_to_show, f"{cfg.model_path}/{cfg.block.partition_id}_log_images/{iteration}.jpg")
         
         with torch.no_grad():
             # Log
@@ -494,13 +496,8 @@ if __name__ == "__main__":
     for point_cloud_dir in all_point_cloud_dir:
         seamless_merge(cfg.model_path, point_cloud_dir)
 
-    # GS_train
-    # pre_training(lp, op, pp, args.test_iterations, args.save_iterations, args.checkpoint_iterations, args.start_checkpoint, args.debug_from)
-
-
     # All done
     print("All Done!")
-
 
     # All done
     print("\nTraining complete.")

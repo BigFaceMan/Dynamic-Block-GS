@@ -55,11 +55,13 @@ def evaluate(split='test'):
 
 
         renders = []
+        masks = []
         gts = []
         image_names = []
-
+        output_loss_info = True
         for cam_info in tqdm(cam_infos, desc="Reading image progress"):
             image_name = cam_info.image_name.split('.')[0]
+
             print("image_name : ", image_name)
             render_path = test_dir / method / f'{image_name}_rgb.png'
             gt_path = test_dir / method / f'{image_name}_gt.png'
@@ -69,6 +71,16 @@ def evaluate(split='test'):
             renders.append(tf.to_tensor(render)[:3, :, :])
             gts.append(tf.to_tensor(gt)[:3, :, :])
             image_names.append(image_name)
+            if hasattr(cam_info, 'original_mask'):
+                mask = cam_info.original_mask.cuda().bool()
+                if output_loss_info:
+                    print("use original_mask")
+            else:
+                mask = torch.ones_like(torch.from_numpy(gt[0:1])).bool()
+                if output_loss_info:
+                    print("use generate_ones_mask")
+            masks.append(mask)
+
 
         psnrs = []
         ssims = []
@@ -76,10 +88,11 @@ def evaluate(split='test'):
 
         for idx in tqdm(range(len(renders)), desc="Metric evaluation progress"):
             render = renders[idx].cuda()
+            mask = masks[idx].cuda()
             gt = gts[idx].cuda()
-            ssims.append(ssim(render, gt))
-            psnrs.append(psnr(render, gt))
-            lpipss.append(lpips(render, gt, net_type='alex'))
+            ssims.append(ssim(render, gt, mask=mask))
+            psnrs.append(psnr(render, gt, mask=mask))
+            lpipss.append(lpips(render, gt, mask=mask, net_type='alex'))
         
         print("  SSIM : {:>12.7f}".format(torch.tensor(ssims).mean(), ".5"))
         print("  PSNR : {:>12.7f}".format(torch.tensor(psnrs).mean(), ".5"))
@@ -92,7 +105,7 @@ def evaluate(split='test'):
         per_view_dict[scene_dir][method].update({"SSIM": {name: ssim for ssim, name in zip(torch.tensor(ssims).tolist(), image_names)},
                                                     "PSNR": {name: psnr for psnr, name in zip(torch.tensor(psnrs).tolist(), image_names)},
                                                     "LPIPS": {name: lp for lp, name in zip(torch.tensor(lpipss).tolist(), image_names)}})
-
+        output_loss_info = True
     with open(scene_dir + f"/results_{split}.json", 'w') as fp:
         json.dump(full_dict[scene_dir], fp, indent=True)
     with open(scene_dir + f"/per_view_{split}.json", 'w') as fp:

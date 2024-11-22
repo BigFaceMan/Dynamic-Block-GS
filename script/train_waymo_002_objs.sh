@@ -2,14 +2,14 @@
 ###
  # @Author: ssp
  # @Date: 2024-11-05 16:28:36
- # @LastEditTime: 2024-11-18 10:17:28
+ # @LastEditTime: 2024-11-22 10:40:28
 ### 
  # @Author: ssp
  # @Date: 2024-11-05 16:28:36
  # @LastEditTime: 2024-11-13 20:28:31
 ### 
-CONFIG_PATH="/lfs1/users/spsong/Code/Dynamic-Block-GS/configs/example/waymo_train_002_objs_s010p1000.yaml"
-CUDA_ID=7
+CONFIG_PATH="/lfs1/users/spsong/Code/Dynamic-Block-GS/configs/example/waymo_train_002_objs_10reg_full.yaml"
+CUDA_ID=2
 
 # 运行训练、渲染和度量脚本
 CUDA_VISIBLE_DEVICES=$CUDA_ID python train.py --config $CONFIG_PATH

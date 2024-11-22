@@ -243,11 +243,11 @@ def readWaymoFullInfo(path, images='images', split_train=-1, split_test=-1, **kw
     print(f'Sphere extent: {sphere_normalization["radius"]}')
 
     pcd: BasicPointCloud = fetchPly(bkgd_ply_path)
-    if cfg.mode == 'train':
-        point_cloud = pcd
-    else:
-        point_cloud = None
-        bkgd_ply_path = None
+    # if cfg.mode == 'train':
+    point_cloud = pcd
+    # else:
+    #     point_cloud = None
+    #     bkgd_ply_path = None
 
     scene_info = SceneInfo(
         point_cloud=point_cloud,
@@ -467,6 +467,7 @@ def partitonReadWaymoFullInfo(path, images='images', split_train=-1, split_test=
     nerf_normalization['radius'] = max(nerf_normalization['radius'], 10)
     
     # 3. If we have extent set in config, we ignore previous setting
+    # Todo fix bug
     if cfg.data.get('extent', False):
         nerf_normalization['radius'] = cfg.data.extent
     
