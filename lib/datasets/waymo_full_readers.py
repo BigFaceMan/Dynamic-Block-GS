@@ -262,6 +262,7 @@ def readWaymoFullInfo(path, images='images', split_train=-1, split_test=-1, **kw
     return scene_info
 
 def partitonReadWaymoFullInfo(path, images='images', split_train=-1, split_test=-1, **kwargs):
+    print("in partitionReadWaymo !!!!!!!!!!!!!!!!!!!!")
     selected_frames = cfg.data.get('selected_frames', None)
     if cfg.debug:
         selected_frames = [0, 0]
@@ -480,7 +481,7 @@ def partitonReadWaymoFullInfo(path, images='images', split_train=-1, split_test=
     print(f'Scene extent: {nerf_normalization["radius"]}')
 
     # 读取分块后的点云
-    lidar_ply_path = os.path.join(cfg.block.partition_model_path, f"{cfg.block.partiton_id}_visible.ply")
+    lidar_ply_path = os.path.join(cfg.block.partition_model_path, f"{cfg.block.partition_id}_visible.ply")
     sphere_pcd: BasicPointCloud = fetchPly(lidar_ply_path)
     
     sphere_normalization = get_Sphere_Norm(sphere_pcd.points)
@@ -488,7 +489,7 @@ def partitonReadWaymoFullInfo(path, images='images', split_train=-1, split_test=
     scene_metadata['sphere_radius'] = sphere_normalization['radius']
     print(f'Sphere extent: {sphere_normalization["radius"]}')
 
-    pcd: BasicPointCloud = fetchPly(lidar_depth_dir)
+    pcd: BasicPointCloud = fetchPly(lidar_ply_path)
     if cfg.mode == 'train':
         point_cloud = pcd
     else:

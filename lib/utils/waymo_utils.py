@@ -797,7 +797,7 @@ def generate_dataparser_outputs_block(
 
     # block cams
     if cfg.block.partition_id != "full":
-        client_camera_txt_path = os.path.join(cfg.partition_model_path, f"{cfg.block.partition_id}_camera.txt")
+        client_camera_txt_path = os.path.join(cfg.block.partition_model_path, f"{cfg.block.partition_id}_camera.txt")
         with open(client_camera_txt_path, 'r', encoding='utf-8') as file:
             lines = file.readlines()
         lines = [line.strip() for line in lines]
